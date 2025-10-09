@@ -145,6 +145,23 @@ const HolidayPredictor: React.FC = () => {
     const subjectPredictions = subjects.map(subject => {
       const subjectSlots = timetableSlots.filter(slot => slot.subjectId === subject.id);
       
+      // Calculate ACTUAL current attendance from records
+      const subjectRecords = attendanceRecords.filter(record => record.subjectId === subject.id);
+      
+      let actualTotalClasses = 0;
+      let actualAttendedClasses = 0;
+      
+      subjectRecords.forEach(record => {
+        if (record.status !== 'holiday') {
+          const count = record.count || 1;
+          actualTotalClasses += count;
+          if (record.status === 'present') {
+            actualAttendedClasses += count;
+          }
+        }
+      });
+      
+      // Calculate future classes for selected month
       let totalClassesInMonth = 0;
       let attendedClasses = 0;
       
@@ -173,8 +190,8 @@ const HolidayPredictor: React.FC = () => {
         }
       }
       
-      const currentAttended = subject.attendedClasses;
-      const currentTotal = subject.totalClasses;
+      const currentAttended = actualAttendedClasses;
+      const currentTotal = actualTotalClasses;
       const currentPercentage = currentTotal > 0 ? (currentAttended / currentTotal) * 100 : 0;
       
       const futureTotal = currentTotal + totalClassesInMonth;
