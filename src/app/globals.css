@@ -55,6 +55,7 @@ body {
   border-radius: 0.5rem !important;
   color: #e5e7eb !important;
   font-family: inherit !important;
+  width: 100% !important;
 }
 
 .react-calendar-dark * {
@@ -65,6 +66,7 @@ body {
   background: #1f2937 !important;
   border-radius: 0.5rem 0.5rem 0 0 !important;
   margin-bottom: 0 !important;
+  display: flex !important;
 }
 
 .react-calendar-dark .react-calendar__navigation button {
@@ -87,6 +89,9 @@ body {
 
 .react-calendar-dark .react-calendar__month-view__weekdays {
   background: #1f2937 !important;
+  display: grid !important;
+  grid-template-columns: repeat(7, 1fr) !important;
+  text-align: center !important;
 }
 
 .react-calendar-dark .react-calendar__month-view__weekdays__weekday {
@@ -94,6 +99,16 @@ body {
   font-weight: 600 !important;
   text-decoration: none !important;
   padding: 0.5rem !important;
+  text-align: center !important;
+}
+
+.react-calendar-dark .react-calendar__month-view__weekdays__weekday abbr {
+  text-decoration: none !important;
+}
+
+.react-calendar-dark .react-calendar__month-view__days {
+  display: grid !important;
+  grid-template-columns: repeat(7, 1fr) !important;
 }
 
 .react-calendar-dark .react-calendar__month-view__days__day {
@@ -102,6 +117,7 @@ body {
   padding: 0.75rem !important;
   border-radius: 0.25rem !important;
   margin: 0.125rem !important;
+  text-align: center !important;
 }
 
 .react-calendar-dark .react-calendar__month-view__days__day:hover {
@@ -115,6 +131,7 @@ body {
 
 .react-calendar-dark .react-calendar__month-view__days__day--neighboringMonth {
   color: #6b7280 !important;
+  opacity: 0.4 !important;
 }
 
 .react-calendar-dark .react-calendar__tile {
@@ -124,6 +141,10 @@ body {
   background: transparent !important;
   border-radius: 0.25rem !important;
   margin: 0.125rem !important;
+  aspect-ratio: 1 / 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }
 
 .react-calendar-dark .react-calendar__tile:enabled:hover,
