@@ -36,6 +36,18 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { subjectId, date, status } = body
 
+    // Get the day of week from the date
+    const dateObj = new Date(date)
+    const dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase()
+    
+    // Count how many periods this subject has on this day
+    const periodsCount = await prisma.timetableSlot.count({
+      where: {
+        subjectId: parseInt(subjectId),
+        dayOfWeek: dayOfWeek
+      }
+    })
+
     const record = await prisma.attendanceRecord.upsert({
       where: {
         subjectId_date: {
@@ -43,11 +55,15 @@ export async function POST(request: NextRequest) {
           date: new Date(date)
         }
       },
-      update: { status },
+      update: { 
+        status,
+        count: periodsCount > 0 ? periodsCount : 1 // Default to 1 if no timetable
+      },
       create: {
         subjectId: parseInt(subjectId),
         date: new Date(date),
-        status
+        status,
+        count: periodsCount > 0 ? periodsCount : 1
       },
       include: { subject: true }
     })

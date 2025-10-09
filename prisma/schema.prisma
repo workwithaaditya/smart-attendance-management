@@ -49,6 +49,7 @@ model AttendanceRecord {
   subjectId Int
   date      DateTime
   status    String   // "present", "absent", "holiday"
+  count     Int      @default(1) // How many periods of this subject on this date
   createdAt DateTime @default(now())
   
   // Relations

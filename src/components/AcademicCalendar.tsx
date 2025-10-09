@@ -49,6 +49,7 @@ interface AttendanceRecord {
   subjectId: number;
   date: string;
   status: 'present' | 'absent' | 'holiday';
+  count: number; // Number of periods for this subject on this date
   subject: Subject;
 }
 
@@ -1514,15 +1515,22 @@ const DailyAttendanceModal: React.FC<{
                           </div>
                         </div>
                         {attendanceRecord && (
-                          <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                            attendanceRecord.status === 'present' 
-                              ? 'bg-green-600 text-white'
-                              : attendanceRecord.status === 'absent'
-                              ? 'bg-red-600 text-white'
-                              : 'bg-yellow-600 text-white'
-                          }`}>
-                            {attendanceRecord.status.toUpperCase()}
-                          </span>
+                          <div className="flex items-center space-x-2">
+                            {attendanceRecord.count && attendanceRecord.count > 1 && (
+                              <span className="text-xs font-medium text-gray-400 bg-gray-600 px-2 py-1 rounded">
+                                {attendanceRecord.count} periods
+                              </span>
+                            )}
+                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                              attendanceRecord.status === 'present' 
+                                ? 'bg-green-600 text-white'
+                                : attendanceRecord.status === 'absent'
+                                ? 'bg-red-600 text-white'
+                                : 'bg-yellow-600 text-white'
+                            }`}>
+                              {attendanceRecord.status.toUpperCase()}
+                            </span>
+                          </div>
                         )}
                       </div>
 
