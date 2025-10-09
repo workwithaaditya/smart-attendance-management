@@ -1,10 +1,13 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import AcademicCalendar from '@/components/AcademicCalendar';
+import HolidayPredictor from '@/components/HolidayPredictor';
 
 export default function HomePage() {
+  const [activeTab, setActiveTab] = useState<'timetable' | 'predictor'>('timetable');
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-gray-900 to-slate-800">
       <div className="container mx-auto px-4 py-8">
@@ -22,13 +25,45 @@ export default function HomePage() {
           </p>
         </motion.div>
 
-        {/* Academic Calendar Component */}
+        {/* Navigation Tabs */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="flex justify-center mb-6"
+        >
+          <div className="bg-gray-800 rounded-lg p-1 flex gap-2">
+            <button
+              onClick={() => setActiveTab('timetable')}
+              className={`px-6 py-3 rounded-lg font-medium transition-all ${
+                activeTab === 'timetable'
+                  ? 'bg-blue-600 text-white shadow-lg'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-700'
+              }`}
+            >
+              📅 Timetable & Attendance
+            </button>
+            <button
+              onClick={() => setActiveTab('predictor')}
+              className={`px-6 py-3 rounded-lg font-medium transition-all ${
+                activeTab === 'predictor'
+                  ? 'bg-purple-600 text-white shadow-lg'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-700'
+              }`}
+            >
+              🔮 Holiday & Attendance Predictor
+            </button>
+          </div>
+        </motion.div>
+
+        {/* Content */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
         >
-          <AcademicCalendar />
+          {activeTab === 'timetable' && <AcademicCalendar />}
+          {activeTab === 'predictor' && <HolidayPredictor />}
         </motion.div>
       </div>
     </div>
