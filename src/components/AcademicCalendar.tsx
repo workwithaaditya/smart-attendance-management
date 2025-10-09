@@ -1,0 +1,1078 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Line } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+} from 'chart.js';
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+);
+
+interface Subject {
+  id: number;
+  name: string;
+  color: string;
+  totalClasses: number;
+  attendedClasses: number;
+}
+
+interface TimetableSlot {
+  id: number;
+  dayOfWeek: string;
+  periodStart: number;
+  periodEnd: number;
+  merged: boolean;
+  subjectId: number;
+  subject: Subject;
+}
+
+interface AcademicCalendarProps {
+  onSubjectUpdate?: (subjects: Subject[]) => void;
+}
+
+const AcademicCalendar: React.FC<AcademicCalendarProps> = ({ onSubjectUpdate }) => {
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [timetableSlots, setTimetableSlots] = useState<TimetableSlot[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedCell, setSelectedCell] = useState<{day: string, period: number} | null>(null);
+  const [showSubjectForm, setShowSubjectForm] = useState(false);
+  const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
+  const [showAttendanceTracker, setShowAttendanceTracker] = useState(false);
+  const [attendanceSubject, setAttendanceSubject] = useState<Subject | null>(null);
+
+  const daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  const periods = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
+  const dayLabels = {
+    monday: 'Mon',
+    tuesday: 'Tue',
+    wednesday: 'Wed',
+    thursday: 'Thu',
+    friday: 'Fri',
+    saturday: 'Sat'
+  };
+
+  // Fetch subjects and timetable data
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [subjectsRes, timetableRes] = await Promise.all([
+          fetch('/api/subjects'),
+          fetch('/api/timetable')
+        ]);
+
+        if (subjectsRes.ok && timetableRes.ok) {
+          const subjectsData = await subjectsRes.json();
+          const timetableData = await timetableRes.json();
+          
+          setSubjects(subjectsData);
+          setTimetableSlots(timetableData);
+          
+          if (onSubjectUpdate) {
+            onSubjectUpdate(subjectsData);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [onSubjectUpdate]);
+
+  const fetchData = async () => {
+    try {
+      const [subjectsRes, timetableRes] = await Promise.all([
+        fetch('/api/subjects'),
+        fetch('/api/timetable')
+      ]);
+
+      if (subjectsRes.ok && timetableRes.ok) {
+        const subjectsData = await subjectsRes.json();
+        const timetableData = await timetableRes.json();
+        
+        setSubjects(subjectsData);
+        setTimetableSlots(timetableData);
+        
+        if (onSubjectUpdate) {
+          onSubjectUpdate(subjectsData);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    }
+  };
+
+  // Get slot for specific day and period
+  const getSlotForCell = (day: string, period: number): TimetableSlot | null => {
+    return timetableSlots.find(slot => 
+      slot.dayOfWeek === day && 
+      period >= slot.periodStart && 
+      period <= slot.periodEnd
+    ) || null;
+  };
+
+  // Check if cell is part of a merged slot but not the starting cell
+  const isCellHidden = (day: string, period: number): boolean => {
+    const slot = getSlotForCell(day, period);
+    return Boolean(slot?.merged && slot.periodStart !== period);
+  };
+
+  // Get span for merged cells
+  const getCellSpan = (day: string, period: number): number => {
+    const slot = getSlotForCell(day, period);
+    if (slot?.merged && slot.periodStart === period) {
+      return slot.periodEnd - slot.periodStart + 1;
+    }
+    return 1;
+  };
+
+  // Handle cell click
+  const handleCellClick = (day: string, period: number) => {
+    const existingSlot = getSlotForCell(day, period);
+    
+    if (existingSlot) {
+      // If clicking on an existing slot, offer to edit or remove
+      setSelectedCell({ day, period });
+    } else {
+      // If empty cell, show subject selection
+      setSelectedCell({ day, period });
+    }
+  };
+
+  // Assign subject to cell
+  const assignSubject = async (subjectId: number, merge: boolean = false) => {
+    if (!selectedCell) return;
+
+    const { day, period } = selectedCell;
+    let periodEnd = period;
+
+    // If merging, find the next period
+    if (merge && period < 10) {
+      const nextSlot = getSlotForCell(day, period + 1);
+      if (!nextSlot) {
+        periodEnd = period + 1;
+      }
+    }
+
+    try {
+      const response = await fetch('/api/timetable', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          dayOfWeek: day,
+          periodStart: period,
+          periodEnd,
+          subjectId,
+          merged: merge
+        }),
+      });
+
+      if (response.ok) {
+        await fetchData(); // Refresh data
+        setSelectedCell(null);
+      }
+    } catch (error) {
+      console.error('Error assigning subject:', error);
+    }
+  };
+
+  // Remove subject from cell
+  const removeSubject = async (day: string, period: number) => {
+    try {
+      const response = await fetch(`/api/timetable?dayOfWeek=${day}&period=${period}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        await fetchData(); // Refresh data
+        setSelectedCell(null);
+      }
+    } catch (error) {
+      console.error('Error removing subject:', error);
+    }
+  };
+
+  // Add new subject
+  const addSubject = async (name: string, color: string) => {
+    try {
+      const response = await fetch('/api/subjects', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name, color }),
+      });
+
+      if (response.ok) {
+        await fetchData();
+        setShowSubjectForm(false);
+      }
+    } catch (error) {
+      console.error('Error adding subject:', error);
+    }
+  };
+
+  // Update subject
+  const updateSubject = async (id: number, updates: Partial<Subject>) => {
+    try {
+      const response = await fetch('/api/subjects', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id, ...updates }),
+      });
+
+      if (response.ok) {
+        await fetchData();
+        setEditingSubject(null);
+      }
+    } catch (error) {
+      console.error('Error updating subject:', error);
+    }
+  };
+
+  // Update subject attendance
+  const updateSubjectAttendance = async (subjectId: number, totalClasses: number, attendedClasses: number) => {
+    try {
+      const response = await fetch('/api/subjects', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: subjectId,
+          totalClasses,
+          attendedClasses,
+        }),
+      });
+
+      if (response.ok) {
+        await fetchData();
+      }
+    } catch (error) {
+      console.error('Failed to update attendance:', error);
+    }
+  };
+
+  // Delete subject
+  const deleteSubject = async (subjectId: number) => {
+    if (!confirm('Are you sure you want to delete this subject? This will also remove it from the timetable.')) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/subjects', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id: subjectId }),
+      });
+
+      if (response.ok) {
+        await fetchData();
+      }
+    } catch (error) {
+      console.error('Failed to delete subject:', error);
+    }
+  };
+
+  // Calculate attendance percentage
+  const getAttendancePercentage = (subject: Subject) => {
+    if (subject.totalClasses === 0) return 0;
+    return Math.round((subject.attendedClasses / subject.totalClasses) * 100);
+  };
+
+  // Generate chart data for attendance trends
+  const getChartData = () => {
+    const labels = subjects.map(s => s.name);
+    const data = subjects.map(s => getAttendancePercentage(s));
+    
+    return {
+      labels,
+      datasets: [
+        {
+          label: 'Attendance Percentage',
+          data,
+          borderColor: 'rgb(59, 130, 246)',
+          backgroundColor: 'rgba(59, 130, 246, 0.1)',
+          borderWidth: 3,
+          fill: true,
+          tension: 0.4,
+          pointBackgroundColor: subjects.map(s => s.color),
+          pointBorderColor: subjects.map(s => s.color),
+          pointRadius: 6,
+          pointHoverRadius: 8,
+        },
+      ],
+    };
+  };
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        labels: {
+          color: '#e5e7eb',
+        },
+      },
+      title: {
+        display: true,
+        text: 'Subject-wise Attendance Trends',
+        color: '#ffffff',
+        font: {
+          size: 16,
+        },
+      },
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        max: 100,
+        ticks: {
+          color: '#9ca3af',
+          callback: function(value: any) {
+            return value + '%';
+          },
+        },
+        grid: {
+          color: 'rgba(156, 163, 175, 0.1)',
+        },
+      },
+      x: {
+        ticks: {
+          color: '#9ca3af',
+        },
+        grid: {
+          color: 'rgba(156, 163, 175, 0.1)',
+        },
+      },
+    },
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-3xl font-bold text-white">Smart Attendance Management</h2>
+          <p className="text-gray-300 mt-1">Create your timetable and track attendance</p>
+        </div>
+        <div className="flex space-x-3">
+          <button
+            onClick={() => setShowAttendanceTracker(true)}
+            className="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 shadow-lg"
+          >
+            📊 Track Attendance
+          </button>
+          <button
+            onClick={() => setShowSubjectForm(true)}
+            className="btn-primary"
+          >
+            + Add Subject
+          </button>
+        </div>
+      </div>
+
+      {/* Subjects List */}
+      <div className="card">
+        <h3 className="text-lg font-semibold text-white mb-4">Subjects ({subjects.length})</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {subjects.map((subject) => (
+            <motion.div
+              key={subject.id}
+              whileHover={{ scale: 1.02 }}
+              className="flex items-center justify-between p-3 rounded-lg border-2"
+              style={{ borderColor: subject.color, backgroundColor: `${subject.color}15` }}
+            >
+              <div className="flex items-center space-x-3">
+                <div
+                  className="w-4 h-4 rounded-full"
+                  style={{ backgroundColor: subject.color }}
+                />
+                <span className="text-sm font-medium text-gray-200 truncate">
+                  {subject.name}
+                </span>
+              </div>
+              <div className="flex space-x-1">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEditingSubject(subject);
+                  }}
+                  className="text-gray-400 hover:text-blue-400 text-xs p-1"
+                  title="Edit Subject"
+                >
+                  ✏️
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteSubject(subject.id);
+                  }}
+                  className="text-gray-400 hover:text-red-400 text-xs p-1"
+                  title="Delete Subject"
+                >
+                  🗑️
+                </button>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+
+      {/* Attendance Chart */}
+      {subjects.length > 0 && subjects.some(s => s.totalClasses > 0) && (
+        <div className="card">
+          <h3 className="text-lg font-semibold text-white mb-4">Attendance Analytics</h3>
+          <div className="h-64 mb-4">
+            <Line data={getChartData()} options={chartOptions} />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {subjects.map((subject) => (
+              <div
+                key={subject.id}
+                className="p-4 rounded-lg border border-gray-600 bg-gray-700/50"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center space-x-2">
+                    <div
+                      className="w-3 h-3 rounded-full"
+                      style={{ backgroundColor: subject.color }}
+                    />
+                    <span className="text-sm font-medium text-gray-200">{subject.name}</span>
+                  </div>
+                  <span
+                    className={`text-sm font-bold ${
+                      getAttendancePercentage(subject) >= 75
+                        ? 'text-green-400'
+                        : getAttendancePercentage(subject) >= 60
+                        ? 'text-yellow-400'
+                        : 'text-red-400'
+                    }`}
+                  >
+                    {getAttendancePercentage(subject)}%
+                  </span>
+                </div>
+                <div className="text-xs text-gray-400">
+                  {subject.attendedClasses} / {subject.totalClasses} classes
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Timetable Grid */}
+      <div className="card overflow-x-auto">
+        <h3 className="text-lg font-semibold text-white mb-4">Weekly Timetable</h3>
+        <div className="min-w-full">
+          {/* Header Row - Periods */}
+          <div className="grid grid-cols-11 gap-1 mb-1">
+            <div className="p-2 text-center font-medium text-gray-400 text-sm">Day</div>
+            {periods.map((period) => (
+              <div key={period} className="p-2 text-center font-medium text-gray-300 text-sm">
+                P{period}
+              </div>
+            ))}
+          </div>
+
+          {/* Timetable Rows - Days */}
+          {daysOfWeek.map((day) => (
+            <div key={day} className="grid grid-cols-11 gap-1 mb-1">
+              {/* Day Label */}
+              <div className="p-3 text-center font-medium text-gray-400 bg-gray-700 rounded text-sm">
+                {dayLabels[day as keyof typeof dayLabels]}
+              </div>
+
+              {/* Period Cells */}
+              {periods.map((period) => {
+                if (isCellHidden(day, period)) {
+                  return null; // Hidden cell (part of merged slot)
+                }
+
+                const slot = getSlotForCell(day, period);
+                const span = getCellSpan(day, period);
+
+                return (
+                  <motion.div
+                    key={`${day}-${period}`}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className={`
+                      relative p-2 h-12 rounded cursor-pointer border-2 transition-all duration-200
+                      ${span > 1 ? `col-span-${span}` : ''}
+                      ${slot
+                        ? 'border-opacity-60 shadow-sm'
+                        : 'border-gray-600 hover:border-blue-400 bg-gray-700/50 hover:bg-gray-600/50'
+                      }
+                    `}
+                    style={{
+                      backgroundColor: slot ? `${slot.subject.color}20` : undefined,
+                      borderColor: slot ? slot.subject.color : '#4B5563',
+                      gridColumn: span > 1 ? `span ${span}` : undefined
+                    }}
+                    onClick={() => handleCellClick(day, period)}
+                  >
+                    {slot && (
+                      <div className="flex flex-col h-full justify-center items-center">
+                        <div
+                          className="text-xs font-medium text-center truncate w-full"
+                          style={{ color: slot.subject.color }}
+                        >
+                          {slot.subject.name}
+                        </div>
+                        {slot.merged && (
+                          <div className="text-xs text-gray-500 mt-1">
+                            P{slot.periodStart}-{slot.periodEnd}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </motion.div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Cell Action Modal */}
+      <AnimatePresence>
+        {selectedCell && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+            onClick={() => setSelectedCell(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 border border-gray-700"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h4 className="text-lg font-semibold mb-4 text-white">
+                {dayLabels[selectedCell.day as keyof typeof dayLabels]} - Period {selectedCell.period}
+              </h4>
+
+              {getSlotForCell(selectedCell.day, selectedCell.period) ? (
+                <div className="space-y-3">
+                  <p className="text-gray-300">Current assignment:</p>
+                  <div className="p-3 rounded-lg bg-gray-700">
+                    <div className="font-medium">
+                      {getSlotForCell(selectedCell.day, selectedCell.period)?.subject.name}
+                    </div>
+                  </div>
+                  <div className="flex space-x-3">
+                    <button
+                      onClick={() => removeSubject(selectedCell.day, selectedCell.period)}
+                      className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                    >
+                      Remove
+                    </button>
+                    <button
+                      onClick={() => setSelectedCell(null)}
+                      className="flex-1 px-4 py-2 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-gray-300">Select a subject:</p>
+                  <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto">
+                    {subjects.map((subject) => (
+                      <button
+                        key={subject.id}
+                        onClick={() => assignSubject(subject.id)}
+                        className="flex items-center space-x-3 p-3 rounded-lg border-2 border-gray-600 hover:bg-gray-700 transition-colors"
+                        style={{ borderColor: subject.color }}
+                      >
+                        <div
+                          className="w-4 h-4 rounded-full"
+                          style={{ backgroundColor: subject.color }}
+                        />
+                        <span className="font-medium">{subject.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                  
+                  {selectedCell.period < 8 && !getSlotForCell(selectedCell.day, selectedCell.period + 1) && (
+                    <div className="border-t pt-3">
+                      <p className="text-sm text-gray-300 mb-2">Or merge with next period:</p>
+                      <div className="grid grid-cols-1 gap-2">
+                        {subjects.map((subject) => (
+                          <button
+                            key={`merge-${subject.id}`}
+                            onClick={() => assignSubject(subject.id, true)}
+                            className="flex items-center justify-between p-2 rounded border border-gray-600 text-sm hover:bg-gray-700"
+                          >
+                            <div className="flex items-center space-x-2">
+                              <div
+                                className="w-3 h-3 rounded-full"
+                                style={{ backgroundColor: subject.color }}
+                              />
+                              <span>{subject.name}</span>
+                            </div>
+                            <span className="text-xs text-gray-500">
+                              P{selectedCell.period}-{selectedCell.period + 1}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  <button
+                    onClick={() => setSelectedCell(null)}
+                    className="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Attendance Tracker Modal */}
+      <AnimatePresence>
+        {showAttendanceTracker && (
+          <AttendanceTrackerModal
+            subjects={subjects}
+            onClose={() => setShowAttendanceTracker(false)}
+            onUpdateAttendance={updateSubjectAttendance}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Add Subject Modal */}
+      <AnimatePresence>
+        {showSubjectForm && (
+          <SubjectFormModal
+            onClose={() => setShowSubjectForm(false)}
+            onSubmit={addSubject}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Edit Subject Modal */}
+      <AnimatePresence>
+        {editingSubject && (
+          <SubjectEditModal
+            subject={editingSubject}
+            onClose={() => setEditingSubject(null)}
+            onSubmit={updateSubject}
+          />
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+// Subject Form Modal Component
+const SubjectFormModal: React.FC<{
+  onClose: () => void;
+  onSubmit: (name: string, color: string) => void;
+}> = ({ onClose, onSubmit }) => {
+  const [name, setName] = useState('');
+  const [color, setColor] = useState('#3B82F6');
+
+  const predefinedColors = [
+    '#3B82F6', '#EF4444', '#10B981', '#F59E0B',
+    '#8B5CF6', '#F97316', '#06B6D4', '#84CC16'
+  ];
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (name.trim()) {
+      onSubmit(name.trim(), color);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        className="bg-white rounded-lg p-6 max-w-md w-full mx-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h4 className="text-lg font-semibold mb-4">Add New Subject</h4>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Subject Name
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="input-field"
+              placeholder="e.g., Mathematics"
+              required
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Color
+            </label>
+            <div className="flex space-x-2 mb-2">
+              {predefinedColors.map((clr) => (
+                <button
+                  key={clr}
+                  type="button"
+                  onClick={() => setColor(clr)}
+                  className={`w-8 h-8 rounded-full border-2 ${
+                    color === clr ? 'border-gray-600' : 'border-gray-300'
+                  }`}
+                  style={{ backgroundColor: clr }}
+                />
+              ))}
+            </div>
+            <input
+              type="color"
+              value={color}
+              onChange={(e) => setColor(e.target.value)}
+              className="w-full h-10 rounded border border-gray-300"
+            />
+          </div>
+          
+          <div className="flex space-x-3">
+            <button
+              type="submit"
+              className="flex-1 btn-primary"
+            >
+              Add Subject
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 btn-secondary"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </motion.div>
+  );
+};
+
+// Subject Edit Modal Component
+const SubjectEditModal: React.FC<{
+  subject: Subject;
+  onClose: () => void;
+  onSubmit: (id: number, updates: Partial<Subject>) => void;
+}> = ({ subject, onClose, onSubmit }) => {
+  const [name, setName] = useState(subject.name);
+  const [color, setColor] = useState(subject.color);
+
+  const predefinedColors = [
+    '#3B82F6', '#EF4444', '#10B981', '#F59E0B',
+    '#8B5CF6', '#F97316', '#06B6D4', '#84CC16'
+  ];
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit(subject.id, { name: name.trim(), color });
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        className="bg-white rounded-lg p-6 max-w-md w-full mx-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h4 className="text-lg font-semibold mb-4">Edit Subject</h4>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Subject Name
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="input-field"
+              required
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Color
+            </label>
+            <div className="flex space-x-2 mb-2">
+              {predefinedColors.map((clr) => (
+                <button
+                  key={clr}
+                  type="button"
+                  onClick={() => setColor(clr)}
+                  className={`w-8 h-8 rounded-full border-2 ${
+                    color === clr ? 'border-gray-600' : 'border-gray-300'
+                  }`}
+                  style={{ backgroundColor: clr }}
+                />
+              ))}
+            </div>
+            <input
+              type="color"
+              value={color}
+              onChange={(e) => setColor(e.target.value)}
+              className="w-full h-10 rounded border border-gray-300"
+            />
+          </div>
+          
+          <div className="flex space-x-3">
+            <button
+              type="submit"
+              className="flex-1 btn-primary"
+            >
+              Update Subject
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 btn-secondary"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </motion.div>
+  );
+};
+
+// Attendance Tracker Modal Component
+const AttendanceTrackerModal: React.FC<{
+  subjects: Subject[];
+  onClose: () => void;
+  onUpdateAttendance: (subjectId: number, totalClasses: number, attendedClasses: number) => void;
+}> = ({ subjects, onClose, onUpdateAttendance }) => {
+  const [attendanceData, setAttendanceData] = useState<{[key: number]: {present: number, absent: number}}>({});
+
+  // Initialize attendance data with current values
+  useEffect(() => {
+    const initialData: {[key: number]: {present: number, absent: number}} = {};
+    subjects.forEach(subject => {
+      initialData[subject.id] = {
+        present: subject.attendedClasses,
+        absent: subject.totalClasses - subject.attendedClasses
+      };
+    });
+    setAttendanceData(initialData);
+  }, [subjects]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Update all subjects - calculate total and attended from present/absent
+    Object.entries(attendanceData).forEach(([subjectId, data]) => {
+      const totalClasses = data.present + data.absent;
+      const attendedClasses = data.present;
+      onUpdateAttendance(parseInt(subjectId), totalClasses, attendedClasses);
+    });
+    
+    onClose();
+  };
+
+  const updateAttendanceForSubject = (subjectId: number, field: 'present' | 'absent', value: number) => {
+    setAttendanceData(prev => ({
+      ...prev,
+      [subjectId]: {
+        ...prev[subjectId],
+        [field]: Math.max(0, value)
+      }
+    }));
+  };
+
+  const getAttendancePercentage = (subjectId: number) => {
+    const data = attendanceData[subjectId];
+    if (!data) return 0;
+    const total = data.present + data.absent;
+    if (total === 0) return 0;
+    return Math.round((data.present / total) * 100);
+  };
+
+  const getTotalClasses = (subjectId: number) => {
+    const data = attendanceData[subjectId];
+    if (!data) return 0;
+    return data.present + data.absent;
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        className="bg-gray-800 rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-gray-700"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-2xl font-bold text-white">Track Attendance</h3>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-white text-2xl"
+          >
+            ×
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <div className="space-y-6">
+            {subjects.map((subject) => (
+              <div key={subject.id} className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center space-x-3">
+                    <div
+                      className="w-4 h-4 rounded-full"
+                      style={{ backgroundColor: subject.color }}
+                    />
+                    <h4 className="text-lg font-semibold text-white">{subject.name}</h4>
+                  </div>
+                  <div className={`text-lg font-bold ${
+                    getAttendancePercentage(subject.id) >= 75
+                      ? 'text-green-400'
+                      : getAttendancePercentage(subject.id) >= 60
+                      ? 'text-yellow-400'
+                      : 'text-red-400'
+                  }`}>
+                    {getAttendancePercentage(subject.id)}%
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Present Classes
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={attendanceData[subject.id]?.present || 0}
+                      onChange={(e) => updateAttendanceForSubject(subject.id, 'present', parseInt(e.target.value) || 0)}
+                      className="input-field"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Absent Classes
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={attendanceData[subject.id]?.absent || 0}
+                      onChange={(e) => updateAttendanceForSubject(subject.id, 'absent', parseInt(e.target.value) || 0)}
+                      className="input-field"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-3 text-sm text-gray-400">
+                  Total Classes: {getTotalClasses(subject.id)} | Present: {attendanceData[subject.id]?.present || 0} | Absent: {attendanceData[subject.id]?.absent || 0}
+                </div>
+
+                <div className="mt-3 flex space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => updateAttendanceForSubject(subject.id, 'present', (attendanceData[subject.id]?.present || 0) + 1)}
+                    className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm"
+                  >
+                    + Add Present
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => updateAttendanceForSubject(subject.id, 'absent', (attendanceData[subject.id]?.absent || 0) + 1)}
+                    className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm"
+                  >
+                    + Add Absent
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex space-x-3 mt-6">
+            <button
+              type="submit"
+              className="flex-1 btn-primary"
+            >
+              Update Attendance
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 btn-secondary"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </motion.div>
+  );
+};
+
+export default AcademicCalendar;

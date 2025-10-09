@@ -1,0 +1,55 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Subject {
+  id               Int                @id @default(autoincrement())
+  name             String             @unique
+  color            String?            @default("#3B82F6") // Default blue color
+  totalClasses     Int                @default(0)
+  attendedClasses  Int                @default(0)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  
+  // Relations
+  timetableSlots   TimetableSlot[]
+  
+  @@map("subjects")
+}
+
+model TimetableSlot {
+  id          Int      @id @default(autoincrement())
+  dayOfWeek   String   // "monday", "tuesday", etc.
+  periodStart Int      // 1-8
+  periodEnd   Int      // 1-8 (same as periodStart unless merged)
+  merged      Boolean  @default(false)
+  subjectId   Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  subject     Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  
+  // Unique constraint to prevent overlapping slots
+  @@unique([dayOfWeek, periodStart, periodEnd])
+  @@map("timetable_slots")
+}
+
+model AttendanceRecord {
+  id        Int      @id @default(autoincrement())
+  subjectId Int
+  date      DateTime
+  status    String   // "present", "absent", "holiday"
+  createdAt DateTime @default(now())
+  
+  @@unique([subjectId, date])
+  @@map("attendance_records")
+}
