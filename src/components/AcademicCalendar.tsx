@@ -65,8 +65,6 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({ onSubjectUpdate }) 
   const [selectedCell, setSelectedCell] = useState<{day: string, period: number} | null>(null);
   const [showSubjectForm, setShowSubjectForm] = useState(false);
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
-  const [showAttendanceTracker, setShowAttendanceTracker] = useState(false);
-  const [attendanceSubject, setAttendanceSubject] = useState<Subject | null>(null);
   const [showDateAttendance, setShowDateAttendance] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showSubjectGraphs, setShowSubjectGraphs] = useState(false);
@@ -509,12 +507,6 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({ onSubjectUpdate }) 
             📈 Subject Graphs
           </button>
           <button
-            onClick={() => setShowAttendanceTracker(true)}
-            className="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 shadow-lg"
-          >
-            📊 Track Attendance
-          </button>
-          <button
             onClick={() => setShowSubjectForm(true)}
             className="btn-primary"
           >
@@ -789,17 +781,6 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({ onSubjectUpdate }) 
         )}
       </AnimatePresence>
 
-      {/* Attendance Tracker Modal */}
-      <AnimatePresence>
-        {showAttendanceTracker && (
-          <AttendanceTrackerModal
-            subjects={subjects}
-            onClose={() => setShowAttendanceTracker(false)}
-            onUpdateAttendance={updateSubjectAttendance}
-          />
-        )}
-      </AnimatePresence>
-
       {/* Add Subject Modal */}
       <AnimatePresence>
         {showSubjectForm && (
@@ -1001,183 +982,6 @@ const SubjectEditModal: React.FC<{
               className="flex-1 btn-primary"
             >
               Update Subject
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 btn-secondary"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-      </motion.div>
-    </motion.div>
-  );
-};
-
-// Attendance Tracker Modal Component
-const AttendanceTrackerModal: React.FC<{
-  subjects: Subject[];
-  onClose: () => void;
-  onUpdateAttendance: (subjectId: number, totalClasses: number, attendedClasses: number) => void;
-}> = ({ subjects, onClose, onUpdateAttendance }) => {
-  const [attendanceData, setAttendanceData] = useState<{[key: number]: {present: number, absent: number}}>({});
-
-  // Initialize attendance data with current values
-  useEffect(() => {
-    const initialData: {[key: number]: {present: number, absent: number}} = {};
-    subjects.forEach(subject => {
-      initialData[subject.id] = {
-        present: subject.attendedClasses,
-        absent: subject.totalClasses - subject.attendedClasses
-      };
-    });
-    setAttendanceData(initialData);
-  }, [subjects]);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // Update all subjects - calculate total and attended from present/absent
-    Object.entries(attendanceData).forEach(([subjectId, data]) => {
-      const totalClasses = data.present + data.absent;
-      const attendedClasses = data.present;
-      onUpdateAttendance(parseInt(subjectId), totalClasses, attendedClasses);
-    });
-    
-    onClose();
-  };
-
-  const updateAttendanceForSubject = (subjectId: number, field: 'present' | 'absent', value: number) => {
-    setAttendanceData(prev => ({
-      ...prev,
-      [subjectId]: {
-        ...prev[subjectId],
-        [field]: Math.max(0, value)
-      }
-    }));
-  };
-
-  const getAttendancePercentage = (subjectId: number) => {
-    const data = attendanceData[subjectId];
-    if (!data) return 0;
-    const total = data.present + data.absent;
-    if (total === 0) return 0;
-    return Math.round((data.present / total) * 100);
-  };
-
-  const getTotalClasses = (subjectId: number) => {
-    const data = attendanceData[subjectId];
-    if (!data) return 0;
-    return data.present + data.absent;
-  };
-
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-      onClick={onClose}
-    >
-      <motion.div
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.9, opacity: 0 }}
-        className="bg-gray-800 rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-gray-700"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="text-2xl font-bold text-white">Track Attendance</h3>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-white text-2xl"
-          >
-            ×
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit}>
-          <div className="space-y-6">
-            {subjects.map((subject) => (
-              <div key={subject.id} className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center space-x-3">
-                    <div
-                      className="w-4 h-4 rounded-full"
-                      style={{ backgroundColor: subject.color }}
-                    />
-                    <h4 className="text-lg font-semibold text-white">{subject.name}</h4>
-                  </div>
-                  <div className={`text-lg font-bold ${
-                    getAttendancePercentage(subject.id) >= 75
-                      ? 'text-green-400'
-                      : getAttendancePercentage(subject.id) >= 60
-                      ? 'text-yellow-400'
-                      : 'text-red-400'
-                  }`}>
-                    {getAttendancePercentage(subject.id)}%
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Present Classes
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={attendanceData[subject.id]?.present || 0}
-                      onChange={(e) => updateAttendanceForSubject(subject.id, 'present', parseInt(e.target.value) || 0)}
-                      className="input-field"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Absent Classes
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={attendanceData[subject.id]?.absent || 0}
-                      onChange={(e) => updateAttendanceForSubject(subject.id, 'absent', parseInt(e.target.value) || 0)}
-                      className="input-field"
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-3 text-sm text-gray-400">
-                  Total Classes: {getTotalClasses(subject.id)} | Present: {attendanceData[subject.id]?.present || 0} | Absent: {attendanceData[subject.id]?.absent || 0}
-                </div>
-
-                <div className="mt-3 flex space-x-2">
-                  <button
-                    type="button"
-                    onClick={() => updateAttendanceForSubject(subject.id, 'present', (attendanceData[subject.id]?.present || 0) + 1)}
-                    className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm"
-                  >
-                    + Add Present
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => updateAttendanceForSubject(subject.id, 'absent', (attendanceData[subject.id]?.absent || 0) + 1)}
-                    className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm"
-                  >
-                    + Add Absent
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="flex space-x-3 mt-6">
-            <button
-              type="submit"
-              className="flex-1 btn-primary"
-            >
-              Update Attendance
             </button>
             <button
               type="button"
