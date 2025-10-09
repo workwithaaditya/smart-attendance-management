@@ -1118,18 +1118,26 @@ const DailyAttendanceModal: React.FC<{
         return;
       }
 
-      // Count duplicate dates - IMPORTANT: Don't deduplicate, count them!
+      // Count duplicate dates
+      // If you enter same date multiple times, it counts as multiple periods
       const dateCountMap = new Map<string, number>();
       parsedDates.forEach(date => {
         const dateStr = date.toISOString().split('T')[0];
         dateCountMap.set(dateStr, (dateCountMap.get(dateStr) || 0) + 1);
       });
 
-      // Import all unique dates - SIMPLE LOGIC: One API call per unique date with count
+      // Import all unique dates
       const subjectId = parseInt(bulkImportData.subjectId);
       const uniqueDates = Array.from(dateCountMap.entries());
       let totalImported = 0;
       let failedDates: string[] = [];
+      
+      console.log('Starting bulk import:', {
+        subjectId,
+        totalDates: parsedDates.length,
+        uniqueDates: uniqueDates.length,
+        timetableSlots: timetableSlots?.length || 0
+      });
       
       for (let i = 0; i < uniqueDates.length; i++) {
         const [dateStr, duplicateCount] = uniqueDates[i];
@@ -1137,13 +1145,22 @@ const DailyAttendanceModal: React.FC<{
         
         // Get day of week to find timetable periods for this subject
         const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
-        const periodsOnDay = timetableSlots.filter(
+        const periodsOnDay = timetableSlots?.filter(
           slot => slot.subjectId === subjectId && slot.dayOfWeek === dayOfWeek
-        ).length;
+        ).length || 0;
         
-        // Total count = duplicate count × periods on that day
-        // Example: 3 same dates in list × 2 periods on Monday = 6 total count
+        // SMART COUNT CALCULATION:
+        // - If you enter same date 2 times + that day has 3 periods = 2 × 3 = 6 total count
+        // - If you enter same date 1 time + that day has 2 periods = 1 × 2 = 2 total count
+        // - If no timetable, each duplicate = 1 count
         const totalCountForDate = duplicateCount * (periodsOnDay || 1);
+        
+        console.log(`Importing ${dateStr}:`, {
+          dayOfWeek,
+          periodsOnDay,
+          duplicateCount,
+          totalCountForDate
+        });
         
         try {
           // Always use replaceWith for clean, predictable behavior
@@ -1176,20 +1193,25 @@ const DailyAttendanceModal: React.FC<{
       onUpdateAttendance(subjectId, new Date(), bulkImportData.status); // Trigger refresh
       
       const duplicateInfo = uniqueDates.filter(([, count]) => count > 1).length > 0 
-        ? ` (${uniqueDates.length} unique dates, ${parsedDates.length} total entries counted)`
+        ? `\n\n📊 Smart Count Applied:\n${uniqueDates.filter(([, count]) => count > 1).map(([date, count]) => {
+            const d = new Date(date);
+            const day = d.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+            const periods = timetableSlots?.filter(s => s.subjectId === subjectId && s.dayOfWeek === day).length || 1;
+            return `  • ${date}: ${count} entries × ${periods} periods = ${count * periods} total`;
+          }).join('\n')}`
         : '';
       
       if (failedDates.length > 0) {
         alert(`⚠️ Partially imported: ${totalImported} succeeded, ${failedDates.length} failed\n\nFailed dates: ${failedDates.slice(0, 5).join(', ')}${failedDates.length > 5 ? '...' : ''}`);
       } else {
-        alert(`✅ Successfully imported ${totalImported} attendance records! 🎉${duplicateInfo}`);
+        alert(`✅ Successfully imported ${totalImported} date(s)! 🎉${duplicateInfo}`);
       }
       
       setBulkImportData({ subjectId: '', dates: '', status: 'present' });
       setShowBulkImport(false);
     } catch (error) {
       console.error('Bulk import error:', error);
-      alert('Error importing dates. Please check the format and try again.');
+      alert(`❌ Error: ${error instanceof Error ? error.message : 'Error importing dates. Please check the format and try again.'}`);
     }
   };
 
@@ -1393,10 +1415,20 @@ const DailyAttendanceModal: React.FC<{
 
               {/* Example Box */}
               <div className="mt-6 bg-gray-900/50 border border-gray-700 rounded-lg p-4">
-                <h5 className="text-sm font-semibold text-yellow-400 mb-2">💡 Example Format</h5>
-                <pre className="text-xs text-gray-300 font-mono">
-19-08-2025{'\n'}21-08-2025{'\n'}22-08-2025{'\n'}24-08-2025{'\n'}26-08-2025
-                </pre>
+                <h5 className="text-sm font-semibold text-yellow-400 mb-2">💡 Smart Duplicate Handling</h5>
+                <div className="text-xs text-gray-300 space-y-2">
+                  <p><strong>Example 1:</strong> If you enter same date 2 times + that day has 3 periods:</p>
+                  <pre className="bg-gray-800 p-2 rounded font-mono">
+19-08-2025
+19-08-2025
+→ Result: 2 × 3 = 6 total count for that date</pre>
+                  
+                  <p className="mt-3"><strong>Example 2:</strong> Different dates, each counted with their periods:</p>
+                  <pre className="bg-gray-800 p-2 rounded font-mono">
+19-08-2025 (Monday: 2 periods)
+21-08-2025 (Wednesday: 3 periods)
+→ Result: 2 + 3 = 5 total classes</pre>
+                </div>
               </div>
             </div>
           </div>
