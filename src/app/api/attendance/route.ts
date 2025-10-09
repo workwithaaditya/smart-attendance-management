@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { subjectId, date, status } = body
+    const { subjectId, date, status, replaceWith } = body
 
     // Get the day of week from the date
     const dateObj = new Date(date)
@@ -48,6 +48,10 @@ export async function POST(request: NextRequest) {
       }
     })
 
+    // If replaceWith is provided, use that count exactly (for bulk import with duplicates)
+    // Otherwise use periodsCount from timetable
+    const finalCount = replaceWith !== undefined ? replaceWith : (periodsCount > 0 ? periodsCount : 1);
+
     const record = await prisma.attendanceRecord.upsert({
       where: {
         subjectId_date: {
@@ -57,13 +61,13 @@ export async function POST(request: NextRequest) {
       },
       update: { 
         status,
-        count: periodsCount > 0 ? periodsCount : 1 // Default to 1 if no timetable
+        count: finalCount
       },
       create: {
         subjectId: parseInt(subjectId),
         date: new Date(date),
         status,
-        count: periodsCount > 0 ? periodsCount : 1
+        count: finalCount
       },
       include: { subject: true }
     })
@@ -80,13 +84,46 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url)
+    const subjectId = searchParams.get('subjectId')
+    const status = searchParams.get('status') as 'present' | 'absent' | 'holiday' | 'all' | null
+    
+    // If both subjectId and status are provided, do bulk delete
+    if (subjectId && status) {
+      const whereCondition = status === 'all' 
+        ? { subjectId: parseInt(subjectId) }
+        : { subjectId: parseInt(subjectId), status };
+      
+      const result = await prisma.attendanceRecord.deleteMany({
+        where: whereCondition
+      });
+
+      // Reset Subject totalClasses and attendedClasses to 0 when clearing records
+      // This prevents stale cumulative data from interfering with fresh imports
+      if (status === 'all' || status === 'present') {
+        await prisma.subject.update({
+          where: { id: parseInt(subjectId) },
+          data: {
+            totalClasses: 0,
+            attendedClasses: 0
+          }
+        });
+      }
+      
+      return NextResponse.json({ 
+        message: `Successfully deleted ${result.count} record(s)`,
+        count: result.count 
+      });
+    }
+    
+    // Otherwise, expect body with single record delete (old behavior)
     const body = await request.json()
-    const { subjectId, date } = body
+    const { subjectId: bodySubjectId, date } = body
 
     await prisma.attendanceRecord.delete({
       where: {
         subjectId_date: {
-          subjectId: parseInt(subjectId),
+          subjectId: parseInt(bodySubjectId),
           date: new Date(date)
         }
       }

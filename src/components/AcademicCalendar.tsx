@@ -1051,6 +1051,39 @@ const DailyAttendanceModal: React.FC<{
     );
   };
 
+  const handleClearRecords = async (subjectId: string, status: 'present' | 'absent' | 'holiday' | 'all') => {
+    const subject = subjects.find(s => s.id === parseInt(subjectId));
+    if (!subject) return;
+
+    const statusText = status === 'all' ? 'ALL records' : 
+                      status === 'present' ? 'Present records' :
+                      status === 'absent' ? 'Absent records' : 'Holiday records';
+    
+    const confirmed = confirm(`⚠️ Are you sure you want to delete ${statusText} for ${subject.name}?\n\nThis action cannot be undone!`);
+    if (!confirmed) return;
+
+    try {
+      const response = await fetch(`/api/attendance?subjectId=${subjectId}&status=${status}`, {
+        method: 'DELETE',
+      });
+
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to delete records');
+      }
+
+      // Refresh attendance data by calling parent callback
+      onUpdateAttendance(parseInt(subjectId), new Date(), 'present');
+      
+      const count = result.count || 0;
+      alert(`✅ Successfully deleted ${count} record(s) (${statusText}) for ${subject.name}`);
+    } catch (error) {
+      console.error('Error deleting records:', error);
+      alert(`❌ Error: ${error instanceof Error ? error.message : 'Could not delete records'}`);
+    }
+  };
+
   const handleBulkImport = async () => {
     if (!bulkImportData.subjectId || !bulkImportData.dates.trim()) {
       alert('Please select a subject and enter dates');
@@ -1085,23 +1118,73 @@ const DailyAttendanceModal: React.FC<{
         return;
       }
 
-      // Import all dates sequentially
+      // Count duplicate dates - IMPORTANT: Don't deduplicate, count them!
+      const dateCountMap = new Map<string, number>();
+      parsedDates.forEach(date => {
+        const dateStr = date.toISOString().split('T')[0];
+        dateCountMap.set(dateStr, (dateCountMap.get(dateStr) || 0) + 1);
+      });
+
+      // Import all unique dates - SIMPLE LOGIC: One API call per unique date with count
       const subjectId = parseInt(bulkImportData.subjectId);
+      const uniqueDates = Array.from(dateCountMap.entries());
+      let totalImported = 0;
+      let failedDates: string[] = [];
       
-      for (let i = 0; i < parsedDates.length; i++) {
-        const date = parsedDates[i];
-        onUpdateAttendance(subjectId, date, bulkImportData.status);
+      for (let i = 0; i < uniqueDates.length; i++) {
+        const [dateStr, duplicateCount] = uniqueDates[i];
+        const date = new Date(dateStr + 'T00:00:00');
         
-        // Small delay to avoid overwhelming the API
-        if (i < parsedDates.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 100));
+        // Get day of week to find timetable periods for this subject
+        const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+        const periodsOnDay = timetableSlots.filter(
+          slot => slot.subjectId === subjectId && slot.dayOfWeek === dayOfWeek
+        ).length;
+        
+        // Total count = duplicate count × periods on that day
+        // Example: 3 same dates in list × 2 periods on Monday = 6 total count
+        const totalCountForDate = duplicateCount * (periodsOnDay || 1);
+        
+        try {
+          // Always use replaceWith for clean, predictable behavior
+          const response = await fetch('/api/attendance', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              subjectId,
+              date: date.toISOString(),
+              status: bulkImportData.status,
+              replaceWith: totalCountForDate // Set exact count
+            })
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            throw new Error(errorData.error || 'Failed to import date');
+          }
+          
+          totalImported++;
+        } catch (err) {
+          console.error(`Failed to import ${dateStr}:`, err);
+          failedDates.push(dateStr);
         }
+        
+        await new Promise(resolve => setTimeout(resolve, 50));
       }
 
-      // Wait a bit for all requests to complete
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Refresh attendance data
+      onUpdateAttendance(subjectId, new Date(), bulkImportData.status); // Trigger refresh
       
-      alert(`Successfully imported ${parsedDates.length} attendance records! 🎉`);
+      const duplicateInfo = uniqueDates.filter(([, count]) => count > 1).length > 0 
+        ? ` (${uniqueDates.length} unique dates, ${parsedDates.length} total entries counted)`
+        : '';
+      
+      if (failedDates.length > 0) {
+        alert(`⚠️ Partially imported: ${totalImported} succeeded, ${failedDates.length} failed\n\nFailed dates: ${failedDates.slice(0, 5).join(', ')}${failedDates.length > 5 ? '...' : ''}`);
+      } else {
+        alert(`✅ Successfully imported ${totalImported} attendance records! 🎉${duplicateInfo}`);
+      }
+      
       setBulkImportData({ subjectId: '', dates: '', status: 'present' });
       setShowBulkImport(false);
     } catch (error) {
@@ -1216,6 +1299,62 @@ const DailyAttendanceModal: React.FC<{
                       🏖️ Holiday
                     </button>
                   </div>
+                </div>
+
+                {/* Clear Records Section */}
+                <div className="bg-red-900/20 border border-red-600/50 rounded-lg p-4">
+                  <label className="block text-sm font-medium text-red-400 mb-3">
+                    🗑️ Clear Records (Before Re-importing)
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => bulkImportData.subjectId && handleClearRecords(bulkImportData.subjectId, 'present')}
+                      disabled={!bulkImportData.subjectId}
+                      className={`py-2 px-3 rounded-lg font-medium text-sm transition-all ${
+                        bulkImportData.subjectId
+                          ? 'bg-red-600 hover:bg-red-700 text-white'
+                          : 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                      }`}
+                    >
+                      Clear All Present
+                    </button>
+                    <button
+                      onClick={() => bulkImportData.subjectId && handleClearRecords(bulkImportData.subjectId, 'absent')}
+                      disabled={!bulkImportData.subjectId}
+                      className={`py-2 px-3 rounded-lg font-medium text-sm transition-all ${
+                        bulkImportData.subjectId
+                          ? 'bg-red-600 hover:bg-red-700 text-white'
+                          : 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                      }`}
+                    >
+                      Clear All Absent
+                    </button>
+                    <button
+                      onClick={() => bulkImportData.subjectId && handleClearRecords(bulkImportData.subjectId, 'holiday')}
+                      disabled={!bulkImportData.subjectId}
+                      className={`py-2 px-3 rounded-lg font-medium text-sm transition-all ${
+                        bulkImportData.subjectId
+                          ? 'bg-red-600 hover:bg-red-700 text-white'
+                          : 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                      }`}
+                    >
+                      Clear All Holiday
+                    </button>
+                    <button
+                      onClick={() => bulkImportData.subjectId && handleClearRecords(bulkImportData.subjectId, 'all')}
+                      disabled={!bulkImportData.subjectId}
+                      className={`py-2 px-3 rounded-lg font-medium text-sm transition-all ${
+                        bulkImportData.subjectId
+                          ? 'bg-red-700 hover:bg-red-800 text-white font-bold'
+                          : 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                      }`}
+                    >
+                      Clear ALL Records
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-2">
+                    ⚠️ Select a subject first. Use before re-importing to avoid duplicates.
+                  </p>
                 </div>
 
                 {/* Dates Input */}
