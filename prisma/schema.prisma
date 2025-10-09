@@ -20,7 +20,8 @@ model Subject {
   updatedAt        DateTime           @updatedAt
   
   // Relations
-  timetableSlots   TimetableSlot[]
+  timetableSlots      TimetableSlot[]
+  attendanceRecords   AttendanceRecord[]
   
   @@map("subjects")
 }
@@ -49,6 +50,9 @@ model AttendanceRecord {
   date      DateTime
   status    String   // "present", "absent", "holiday"
   createdAt DateTime @default(now())
+  
+  // Relations
+  subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
   
   @@unique([subjectId, date])
   @@map("attendance_records")

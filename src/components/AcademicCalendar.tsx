@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Line } from 'react-chartjs-2';
+import Calendar from 'react-calendar';
+import 'react-calendar/dist/Calendar.css';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -42,6 +44,14 @@ interface TimetableSlot {
   subject: Subject;
 }
 
+interface AttendanceRecord {
+  id: number;
+  subjectId: number;
+  date: string;
+  status: 'present' | 'absent' | 'holiday';
+  subject: Subject;
+}
+
 interface AcademicCalendarProps {
   onSubjectUpdate?: (subjects: Subject[]) => void;
 }
@@ -49,12 +59,16 @@ interface AcademicCalendarProps {
 const AcademicCalendar: React.FC<AcademicCalendarProps> = ({ onSubjectUpdate }) => {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [timetableSlots, setTimetableSlots] = useState<TimetableSlot[]>([]);
+  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCell, setSelectedCell] = useState<{day: string, period: number} | null>(null);
   const [showSubjectForm, setShowSubjectForm] = useState(false);
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
   const [showAttendanceTracker, setShowAttendanceTracker] = useState(false);
   const [attendanceSubject, setAttendanceSubject] = useState<Subject | null>(null);
+  const [showDateAttendance, setShowDateAttendance] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [showSubjectGraphs, setShowSubjectGraphs] = useState(false);
 
   const daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
   const periods = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
@@ -72,17 +86,20 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({ onSubjectUpdate }) 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [subjectsRes, timetableRes] = await Promise.all([
+        const [subjectsRes, timetableRes, attendanceRes] = await Promise.all([
           fetch('/api/subjects'),
-          fetch('/api/timetable')
+          fetch('/api/timetable'),
+          fetch('/api/attendance')
         ]);
 
-        if (subjectsRes.ok && timetableRes.ok) {
+        if (subjectsRes.ok && timetableRes.ok && attendanceRes.ok) {
           const subjectsData = await subjectsRes.json();
           const timetableData = await timetableRes.json();
+          const attendanceData = await attendanceRes.json();
           
           setSubjects(subjectsData);
           setTimetableSlots(timetableData);
+          setAttendanceRecords(attendanceData);
           
           if (onSubjectUpdate) {
             onSubjectUpdate(subjectsData);
@@ -305,6 +322,90 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({ onSubjectUpdate }) 
     return Math.round((subject.attendedClasses / subject.totalClasses) * 100);
   };
 
+  // Add or update attendance record
+  const updateAttendanceRecord = async (subjectId: number, date: Date, status: 'present' | 'absent' | 'holiday') => {
+    try {
+      const response = await fetch('/api/attendance', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          subjectId,
+          date: date.toISOString(),
+          status,
+        }),
+      });
+
+      if (response.ok) {
+        // Refresh attendance records
+        const attendanceRes = await fetch('/api/attendance');
+        if (attendanceRes.ok) {
+          const attendanceData = await attendanceRes.json();
+          setAttendanceRecords(attendanceData);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to update attendance record:', error);
+    }
+  };
+
+  // Get attendance records for a specific subject
+  const getSubjectAttendanceData = (subjectId: number) => {
+    return attendanceRecords
+      .filter(record => record.subjectId === subjectId)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  };
+
+  // Generate chart data for a specific subject's attendance over time
+  const getSubjectChartData = (subjectId: number) => {
+    const records = getSubjectAttendanceData(subjectId);
+    const subject = subjects.find(s => s.id === subjectId);
+    
+    if (!subject || records.length === 0) {
+      return null;
+    }
+
+    // Calculate cumulative attendance percentage over time
+    let presentCount = 0;
+    let totalCount = 0;
+    
+    const labels: string[] = [];
+    const data: number[] = [];
+
+    records.forEach(record => {
+      if (record.status !== 'holiday') {
+        totalCount++;
+        if (record.status === 'present') {
+          presentCount++;
+        }
+        
+        const percentage = totalCount > 0 ? Math.round((presentCount / totalCount) * 100) : 0;
+        labels.push(new Date(record.date).toLocaleDateString());
+        data.push(percentage);
+      }
+    });
+
+    return {
+      labels,
+      datasets: [
+        {
+          label: `${subject.name} Attendance %`,
+          data,
+          borderColor: subject.color,
+          backgroundColor: `${subject.color}20`,
+          borderWidth: 3,
+          fill: true,
+          tension: 0.4,
+          pointBackgroundColor: subject.color,
+          pointBorderColor: subject.color,
+          pointRadius: 5,
+          pointHoverRadius: 7,
+        },
+      ],
+    };
+  };
+
   // Generate chart data for attendance trends
   const getChartData = () => {
     const labels = subjects.map(s => s.name);
@@ -390,6 +491,18 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({ onSubjectUpdate }) 
           <p className="text-gray-300 mt-1">Create your timetable and track attendance</p>
         </div>
         <div className="flex space-x-3">
+          <button
+            onClick={() => setShowDateAttendance(true)}
+            className="bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 shadow-lg"
+          >
+            📅 Daily Attendance
+          </button>
+          <button
+            onClick={() => setShowSubjectGraphs(true)}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 shadow-lg"
+          >
+            📈 Subject Graphs
+          </button>
           <button
             onClick={() => setShowAttendanceTracker(true)}
             className="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 shadow-lg"
@@ -668,6 +781,32 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({ onSubjectUpdate }) 
               )}
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Daily Attendance Modal */}
+      <AnimatePresence>
+        {showDateAttendance && (
+          <DailyAttendanceModal
+            subjects={subjects}
+            timetableSlots={timetableSlots}
+            attendanceRecords={attendanceRecords}
+            selectedDate={selectedDate}
+            onDateChange={setSelectedDate}
+            onClose={() => setShowDateAttendance(false)}
+            onUpdateAttendance={updateAttendanceRecord}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Subject Graphs Modal */}
+      <AnimatePresence>
+        {showSubjectGraphs && (
+          <SubjectGraphsModal
+            subjects={subjects}
+            onClose={() => setShowSubjectGraphs(false)}
+            getSubjectChartData={getSubjectChartData}
+          />
         )}
       </AnimatePresence>
 
@@ -1070,6 +1209,270 @@ const AttendanceTrackerModal: React.FC<{
             </button>
           </div>
         </form>
+      </motion.div>
+    </motion.div>
+  );
+};
+
+// Daily Attendance Modal Component
+const DailyAttendanceModal: React.FC<{
+  subjects: Subject[];
+  timetableSlots: TimetableSlot[];
+  attendanceRecords: AttendanceRecord[];
+  selectedDate: Date;
+  onDateChange: (date: Date) => void;
+  onClose: () => void;
+  onUpdateAttendance: (subjectId: number, date: Date, status: 'present' | 'absent' | 'holiday') => void;
+}> = ({ subjects, timetableSlots, attendanceRecords, selectedDate, onDateChange, onClose, onUpdateAttendance }) => {
+  
+  const getDayName = (date: Date) => {
+    return date.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+  };
+
+  const getSubjectsForDay = (dayName: string) => {
+    const daySlots = timetableSlots.filter(slot => slot.dayOfWeek === dayName);
+    const subjectIds = [...new Set(daySlots.map(slot => slot.subjectId))];
+    return subjects.filter(subject => subjectIds.includes(subject.id));
+  };
+
+  const getAttendanceForDate = (subjectId: number, date: Date) => {
+    const dateStr = date.toISOString().split('T')[0];
+    return attendanceRecords.find(record => 
+      record.subjectId === subjectId && record.date.split('T')[0] === dateStr
+    );
+  };
+
+  const dayName = getDayName(selectedDate);
+  const subjectsForDay = getSubjectsForDay(dayName);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        className="bg-gray-800 rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-gray-700"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-2xl font-bold text-white">Daily Attendance</h3>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-white text-2xl"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Calendar */}
+          <div>
+            <h4 className="text-lg font-semibold text-white mb-4">Select Date</h4>
+            <div className="bg-gray-700 p-4 rounded-lg">
+              <Calendar
+                onChange={(value) => onDateChange(value as Date)}
+                value={selectedDate}
+                className="react-calendar-dark"
+              />
+            </div>
+          </div>
+
+          {/* Subjects for selected date */}
+          <div>
+            <h4 className="text-lg font-semibold text-white mb-4">
+              Subjects for {selectedDate.toLocaleDateString()} ({dayName})
+            </h4>
+            
+            {subjectsForDay.length === 0 ? (
+              <p className="text-gray-400">No subjects scheduled for this day.</p>
+            ) : (
+              <div className="space-y-4">
+                {subjectsForDay.map((subject) => {
+                  const attendanceRecord = getAttendanceForDate(subject.id, selectedDate);
+                  
+                  return (
+                    <div key={subject.id} className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center space-x-3">
+                          <div
+                            className="w-4 h-4 rounded-full"
+                            style={{ backgroundColor: subject.color }}
+                          />
+                          <span className="text-lg font-semibold text-white">{subject.name}</span>
+                        </div>
+                        {attendanceRecord && (
+                          <span className={`px-2 py-1 rounded text-sm font-medium ${
+                            attendanceRecord.status === 'present' 
+                              ? 'bg-green-600 text-white'
+                              : attendanceRecord.status === 'absent'
+                              ? 'bg-red-600 text-white'
+                              : 'bg-yellow-600 text-white'
+                          }`}>
+                            {attendanceRecord.status.toUpperCase()}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => onUpdateAttendance(subject.id, selectedDate, 'present')}
+                          className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${
+                            attendanceRecord?.status === 'present'
+                              ? 'bg-green-600 text-white'
+                              : 'bg-gray-600 hover:bg-green-600 text-gray-200 hover:text-white'
+                          }`}
+                        >
+                          Present
+                        </button>
+                        <button
+                          onClick={() => onUpdateAttendance(subject.id, selectedDate, 'absent')}
+                          className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${
+                            attendanceRecord?.status === 'absent'
+                              ? 'bg-red-600 text-white'
+                              : 'bg-gray-600 hover:bg-red-600 text-gray-200 hover:text-white'
+                          }`}
+                        >
+                          Absent
+                        </button>
+                        <button
+                          onClick={() => onUpdateAttendance(subject.id, selectedDate, 'holiday')}
+                          className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${
+                            attendanceRecord?.status === 'holiday'
+                              ? 'bg-yellow-600 text-white'
+                              : 'bg-gray-600 hover:bg-yellow-600 text-gray-200 hover:text-white'
+                          }`}
+                        >
+                          Holiday
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+};
+
+// Subject Graphs Modal Component
+const SubjectGraphsModal: React.FC<{
+  subjects: Subject[];
+  onClose: () => void;
+  getSubjectChartData: (subjectId: number) => any;
+}> = ({ subjects, onClose, getSubjectChartData }) => {
+  
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        labels: {
+          color: '#e5e7eb',
+        },
+      },
+      title: {
+        display: true,
+        color: '#ffffff',
+        font: {
+          size: 16,
+        },
+      },
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        max: 100,
+        ticks: {
+          color: '#9ca3af',
+          callback: function(value: any) {
+            return value + '%';
+          },
+        },
+        grid: {
+          color: 'rgba(156, 163, 175, 0.1)',
+        },
+      },
+      x: {
+        ticks: {
+          color: '#9ca3af',
+        },
+        grid: {
+          color: 'rgba(156, 163, 175, 0.1)',
+        },
+      },
+    },
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        className="bg-gray-800 rounded-lg p-6 max-w-7xl w-full max-h-[90vh] overflow-y-auto border border-gray-700"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-2xl font-bold text-white">Subject-wise Attendance Trends</h3>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-white text-2xl"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {subjects.map((subject) => {
+            const chartData = getSubjectChartData(subject.id);
+            
+            return (
+              <div key={subject.id} className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
+                <div className="flex items-center space-x-3 mb-4">
+                  <div
+                    className="w-4 h-4 rounded-full"
+                    style={{ backgroundColor: subject.color }}
+                  />
+                  <h4 className="text-lg font-semibold text-white">{subject.name}</h4>
+                </div>
+                
+                {chartData ? (
+                  <div className="h-64">
+                    <Line data={chartData} options={{
+                      ...chartOptions,
+                      plugins: {
+                        ...chartOptions.plugins,
+                        title: {
+                          ...chartOptions.plugins.title,
+                          text: `${subject.name} Attendance Over Time`,
+                        },
+                      },
+                    }} />
+                  </div>
+                ) : (
+                  <div className="h-64 flex items-center justify-center text-gray-400">
+                    <p>No attendance data available</p>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </motion.div>
     </motion.div>
   );
