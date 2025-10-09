@@ -369,22 +369,39 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({ onSubjectUpdate }) 
       return null;
     }
 
+    // Show only recent 15 records for cleaner visualization
+    // User can still see full data in the stats cards
+    const recentRecords = records.slice(-15);
+
     // Calculate cumulative attendance percentage over time
     let presentCount = 0;
     let totalCount = 0;
     
+    // First, count all records before the recent ones for accurate percentage
+    // IMPORTANT: Use record.count field to count actual periods, not just records!
+    records.slice(0, -15).forEach(record => {
+      if (record.status !== 'holiday') {
+        const periodCount = (record as any).count || 1;
+        totalCount += periodCount;
+        if (record.status === 'present') {
+          presentCount += periodCount;
+        }
+      }
+    });
+    
     const labels: string[] = [];
     const data: number[] = [];
 
-    records.forEach(record => {
+    recentRecords.forEach(record => {
       if (record.status !== 'holiday') {
-        totalCount++;
+        const periodCount = (record as any).count || 1;
+        totalCount += periodCount;
         if (record.status === 'present') {
-          presentCount++;
+          presentCount += periodCount;
         }
         
-        const percentage = totalCount > 0 ? Math.round((presentCount / totalCount) * 100) : 0;
-        labels.push(new Date(record.date).toLocaleDateString());
+        const percentage = totalCount > 0 ? Math.round((presentCount / totalCount) * 100 * 10) / 10 : 0;
+        labels.push(new Date(record.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }));
         data.push(percentage);
       }
     });
@@ -775,6 +792,7 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({ onSubjectUpdate }) 
         {showSubjectGraphs && (
           <SubjectGraphsModal
             subjects={subjects}
+            attendanceRecords={attendanceRecords}
             onClose={() => setShowSubjectGraphs(false)}
             getSubjectChartData={getSubjectChartData}
           />
@@ -1395,10 +1413,31 @@ const DailyAttendanceModal: React.FC<{
 // Subject Graphs Modal Component
 const SubjectGraphsModal: React.FC<{
   subjects: Subject[];
+  attendanceRecords: AttendanceRecord[];
   onClose: () => void;
   getSubjectChartData: (subjectId: number) => any;
-}> = ({ subjects, onClose, getSubjectChartData }) => {
+}> = ({ subjects, attendanceRecords, onClose, getSubjectChartData }) => {
   
+  // Calculate statistics for a subject
+  const getSubjectStats = (subjectId: number) => {
+    const records = attendanceRecords.filter(r => r.subjectId === subjectId);
+    const presentRecords = records.filter(r => r.status === 'present');
+    const absentRecords = records.filter(r => r.status === 'absent');
+    
+    const totalPresent = presentRecords.reduce((sum, r) => sum + ((r as any).count || 1), 0);
+    const totalAbsent = absentRecords.reduce((sum, r) => sum + ((r as any).count || 1), 0);
+    const totalClasses = totalPresent + totalAbsent;
+    const percentage = totalClasses > 0 ? (totalPresent / totalClasses) * 100 : 0;
+    
+    return {
+      totalPresent,
+      totalAbsent,
+      totalClasses,
+      percentage,
+      recordCount: records.filter(r => r.status !== 'holiday').length
+    };
+  };
+
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
@@ -1406,13 +1445,17 @@ const SubjectGraphsModal: React.FC<{
       legend: {
         labels: {
           color: '#e5e7eb',
+          font: {
+            size: 13,
+          },
         },
       },
       title: {
         display: true,
         color: '#ffffff',
         font: {
-          size: 16,
+          size: 18,
+          weight: 'bold' as const,
         },
       },
     },
@@ -1422,6 +1465,9 @@ const SubjectGraphsModal: React.FC<{
         max: 100,
         ticks: {
           color: '#9ca3af',
+          font: {
+            size: 12,
+          },
           callback: function(value: any) {
             return value + '%';
           },
@@ -1433,6 +1479,11 @@ const SubjectGraphsModal: React.FC<{
       x: {
         ticks: {
           color: '#9ca3af',
+          font: {
+            size: 11,
+          },
+          maxRotation: 45,
+          minRotation: 45,
         },
         grid: {
           color: 'rgba(156, 163, 175, 0.1)',
@@ -1453,48 +1504,106 @@ const SubjectGraphsModal: React.FC<{
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.9, opacity: 0 }}
-        className="bg-gray-800 rounded-lg p-6 max-w-7xl w-full max-h-[90vh] overflow-y-auto border border-gray-700"
+        className="bg-gray-800 rounded-lg p-8 max-w-4xl w-full max-h-[95vh] overflow-y-auto border border-gray-700 snap-y snap-mandatory"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="text-2xl font-bold text-white">Subject-wise Attendance Trends</h3>
+        <div className="flex justify-between items-center mb-8 sticky top-0 bg-gray-800 z-10 pb-4">
+          <div>
+            <h3 className="text-3xl font-bold text-white">📊 Subject-wise Attendance Trends</h3>
+            <p className="text-sm text-gray-400 mt-1">Scroll down to see all subjects • Recent trends shown</p>
+          </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-white text-2xl"
+            className="text-gray-400 hover:text-white text-3xl font-bold"
           >
             ×
           </button>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="space-y-8">
           {subjects.map((subject) => {
             const chartData = getSubjectChartData(subject.id);
+            const stats = getSubjectStats(subject.id);
             
             return (
-              <div key={subject.id} className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
-                <div className="flex items-center space-x-3 mb-4">
-                  <div
-                    className="w-4 h-4 rounded-full"
-                    style={{ backgroundColor: subject.color }}
-                  />
-                  <h4 className="text-lg font-semibold text-white">{subject.name}</h4>
+              <div key={subject.id} className="bg-gray-700/50 rounded-xl p-6 border-2 border-gray-600 hover:border-gray-500 transition-colors snap-start min-h-[600px]">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center space-x-3">
+                    <div
+                      className="w-6 h-6 rounded-full shadow-lg"
+                      style={{ backgroundColor: subject.color }}
+                    />
+                    <h4 className="text-2xl font-bold text-white">{subject.name}</h4>
+                  </div>
+                  <div className={`text-3xl font-bold ${
+                    stats.percentage >= 75 ? 'text-green-400' : 
+                    stats.percentage >= 60 ? 'text-yellow-400' : 'text-red-400'
+                  }`}>
+                    {stats.percentage.toFixed(1)}%
+                  </div>
+                </div>
+
+                {/* Statistics Cards */}
+                <div className="grid grid-cols-3 gap-4 mb-6">
+                  <div className="bg-green-900/30 border border-green-600/50 rounded-lg p-4 text-center">
+                    <div className="text-3xl font-bold text-green-400">{stats.totalPresent}</div>
+                    <div className="text-sm text-gray-400 mt-1">Present</div>
+                  </div>
+                  <div className="bg-red-900/30 border border-red-600/50 rounded-lg p-4 text-center">
+                    <div className="text-3xl font-bold text-red-400">{stats.totalAbsent}</div>
+                    <div className="text-sm text-gray-400 mt-1">Absent</div>
+                  </div>
+                  <div className="bg-blue-900/30 border border-blue-600/50 rounded-lg p-4 text-center">
+                    <div className="text-3xl font-bold text-blue-400">{stats.totalClasses}</div>
+                    <div className="text-sm text-gray-400 mt-1">Total Classes</div>
+                  </div>
                 </div>
                 
-                {chartData ? (
-                  <div className="h-64">
-                    <Line data={chartData} options={{
-                      ...chartOptions,
-                      plugins: {
-                        ...chartOptions.plugins,
-                        title: {
-                          ...chartOptions.plugins.title,
-                          text: `${subject.name} Attendance Over Time`,
+                {chartData && stats.recordCount > 0 ? (
+                  <div>
+                    <div className="h-96 bg-gray-800/50 rounded-lg p-4 mb-4">
+                      <Line data={chartData} options={{
+                        ...chartOptions,
+                        plugins: {
+                          ...chartOptions.plugins,
+                          title: {
+                            ...chartOptions.plugins.title,
+                            text: `${subject.name} - Recent Attendance Trend (Last ${chartData.labels.length} classes)`,
+                          },
                         },
-                      },
-                    }} />
+                        scales: {
+                          ...chartOptions.scales,
+                          y: {
+                            ...chartOptions.scales.y,
+                            min: (() => {
+                              // Calculate dynamic Y-axis minimum based on data range
+                              const minValue = Math.min(...chartData.datasets[0].data);
+                              const maxValue = Math.max(...chartData.datasets[0].data);
+                              const range = maxValue - minValue;
+                              
+                              // If attendance is consistently high (range small and all values > 70)
+                              if (minValue >= 70 && range <= 30) {
+                                return Math.max(0, Math.floor(minValue / 10) * 10 - 10); // Round down to nearest 10, then subtract 10
+                              }
+                              // If attendance is in mid range (50-80)
+                              else if (minValue >= 50 && maxValue <= 90) {
+                                return Math.max(0, Math.floor(minValue / 10) * 10 - 10);
+                              }
+                              // Default to 0 for low or highly variable attendance
+                              return 0;
+                            })(),
+                          },
+                        },
+                      }} />
+                    </div>
+                    {stats.recordCount > 15 && (
+                      <div className="text-center text-sm text-gray-400 mb-4">
+                        📊 Showing recent {chartData.labels.length} classes • Total: {stats.recordCount} records
+                      </div>
+                    )}
                   </div>
                 ) : (
-                  <div className="h-64 flex items-center justify-center text-gray-400">
+                  <div className="h-96 flex items-center justify-center text-gray-400">
                     <p>No attendance data available</p>
                   </div>
                 )}
