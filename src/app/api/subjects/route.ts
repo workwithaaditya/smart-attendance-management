@@ -27,6 +27,18 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { name, color, totalClasses, attendedClasses } = body
 
+    // Check if subject with same name already exists
+    const existingSubject = await prisma.subject.findFirst({
+      where: { name: name }
+    })
+
+    if (existingSubject) {
+      return NextResponse.json(
+        { error: 'A subject with this name already exists' },
+        { status: 409 }
+      )
+    }
+
     const subject = await prisma.subject.create({
       data: {
         name,
@@ -37,8 +49,17 @@ export async function POST(request: NextRequest) {
     })
 
     return NextResponse.json(subject, { status: 201 })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating subject:', error)
+    
+    // Handle Prisma unique constraint error
+    if (error.code === 'P2002') {
+      return NextResponse.json(
+        { error: 'A subject with this name already exists' },
+        { status: 409 }
+      )
+    }
+    
     return NextResponse.json(
       { error: 'Failed to create subject' },
       { status: 500 }

@@ -244,9 +244,13 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({ onSubjectUpdate }) 
       if (response.ok) {
         await fetchData();
         setShowSubjectForm(false);
+      } else {
+        const errorData = await response.json();
+        alert(errorData.error || 'Failed to add subject. Please try again.');
       }
     } catch (error) {
       console.error('Error adding subject:', error);
+      alert('Failed to add subject. Please try again.');
     }
   };
 
@@ -727,53 +731,27 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({ onSubjectUpdate }) 
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <p className="text-gray-300">Select a subject:</p>
-                  <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto">
+                  <p className="text-gray-300 text-lg font-medium">Select a subject:</p>
+                  <div className="grid grid-cols-1 gap-3 max-h-96 overflow-y-auto">
                     {subjects.map((subject) => (
                       <button
                         key={subject.id}
                         onClick={() => assignSubject(subject.id)}
-                        className="flex items-center space-x-3 p-3 rounded-lg border-2 border-gray-600 hover:bg-gray-700 transition-colors"
+                        className="flex items-center space-x-4 p-5 rounded-lg border-2 border-gray-600 hover:bg-gray-700 transition-colors text-left"
                         style={{ borderColor: subject.color }}
                       >
                         <div
-                          className="w-4 h-4 rounded-full"
+                          className="w-6 h-6 rounded-full flex-shrink-0"
                           style={{ backgroundColor: subject.color }}
                         />
-                        <span className="font-medium">{subject.name}</span>
+                        <span className="font-semibold text-lg">{subject.name}</span>
                       </button>
                     ))}
                   </div>
                   
-                  {selectedCell.period < 8 && !getSlotForCell(selectedCell.day, selectedCell.period + 1) && (
-                    <div className="border-t pt-3">
-                      <p className="text-sm text-gray-300 mb-2">Or merge with next period:</p>
-                      <div className="grid grid-cols-1 gap-2">
-                        {subjects.map((subject) => (
-                          <button
-                            key={`merge-${subject.id}`}
-                            onClick={() => assignSubject(subject.id, true)}
-                            className="flex items-center justify-between p-2 rounded border border-gray-600 text-sm hover:bg-gray-700"
-                          >
-                            <div className="flex items-center space-x-2">
-                              <div
-                                className="w-3 h-3 rounded-full"
-                                style={{ backgroundColor: subject.color }}
-                              />
-                              <span>{subject.name}</span>
-                            </div>
-                            <span className="text-xs text-gray-500">
-                              P{selectedCell.period}-{selectedCell.period + 1}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  
                   <button
                     onClick={() => setSelectedCell(null)}
-                    className="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                    className="w-full px-4 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-500 transition-colors font-medium"
                   >
                     Cancel
                   </button>
@@ -1225,6 +1203,14 @@ const DailyAttendanceModal: React.FC<{
   onUpdateAttendance: (subjectId: number, date: Date, status: 'present' | 'absent' | 'holiday') => void;
 }> = ({ subjects, timetableSlots, attendanceRecords, selectedDate, onDateChange, onClose, onUpdateAttendance }) => {
   
+  const [showAllSubjects, setShowAllSubjects] = useState(false);
+  const [showBulkImport, setShowBulkImport] = useState(false);
+  const [bulkImportData, setBulkImportData] = useState({
+    subjectId: '',
+    dates: '',
+    status: 'present' as 'present' | 'absent' | 'holiday'
+  });
+  
   const getDayName = (date: Date) => {
     return date.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
   };
@@ -1242,8 +1228,59 @@ const DailyAttendanceModal: React.FC<{
     );
   };
 
+  const handleBulkImport = async () => {
+    if (!bulkImportData.subjectId || !bulkImportData.dates.trim()) {
+      alert('Please select a subject and enter dates');
+      return;
+    }
+
+    try {
+      // Parse dates - supports multiple formats
+      const dateLines = bulkImportData.dates.split('\n').filter(line => line.trim());
+      const parsedDates: Date[] = [];
+
+      for (const line of dateLines) {
+        // Remove extra spaces and split by common separators
+        const cleanLine = line.trim();
+        
+        // Try to extract date in various formats
+        // Format: DD-MM-YYYY or DD/MM/YYYY or YYYY-MM-DD
+        const dateMatch = cleanLine.match(/(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/);
+        
+        if (dateMatch) {
+          const [, day, month, year] = dateMatch;
+          const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+          
+          if (!isNaN(date.getTime())) {
+            parsedDates.push(date);
+          }
+        }
+      }
+
+      if (parsedDates.length === 0) {
+        alert('No valid dates found. Please use format: DD-MM-YYYY (one per line)');
+        return;
+      }
+
+      // Import all dates
+      let successCount = 0;
+      for (const date of parsedDates) {
+        await onUpdateAttendance(parseInt(bulkImportData.subjectId), date, bulkImportData.status);
+        successCount++;
+      }
+
+      alert(`Successfully imported ${successCount} attendance records!`);
+      setBulkImportData({ subjectId: '', dates: '', status: 'present' });
+      setShowBulkImport(false);
+    } catch (error) {
+      console.error('Bulk import error:', error);
+      alert('Error importing dates. Please check the format and try again.');
+    }
+  };
+
   const dayName = getDayName(selectedDate);
   const subjectsForDay = getSubjectsForDay(dayName);
+  const displaySubjects = showAllSubjects ? subjects : subjectsForDay;
 
   return (
     <motion.div
@@ -1257,20 +1294,143 @@ const DailyAttendanceModal: React.FC<{
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.9, opacity: 0 }}
-        className="bg-gray-800 rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-gray-700"
+        className="bg-gray-800 rounded-lg p-6 max-w-5xl w-full max-h-[90vh] overflow-y-auto border border-gray-700"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-6">
-          <h3 className="text-2xl font-bold text-white">Daily Attendance</h3>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-white text-2xl"
-          >
-            ×
-          </button>
+          <div>
+            <h3 className="text-2xl font-bold text-white">Daily Attendance Tracker</h3>
+            <p className="text-sm text-gray-400 mt-1">Mark attendance for any date to build historical data</p>
+          </div>
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={() => setShowBulkImport(!showBulkImport)}
+              className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                showBulkImport 
+                  ? 'bg-blue-600 text-white' 
+                  : 'bg-gray-700 hover:bg-gray-600 text-gray-200'
+              }`}
+            >
+              📋 {showBulkImport ? 'Single Entry' : 'Bulk Import'}
+            </button>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-white text-2xl"
+            >
+              ×
+            </button>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {showBulkImport ? (
+          <div className="space-y-6">
+            <div className="bg-blue-900/20 border-2 border-blue-600/50 rounded-lg p-6">
+              <h4 className="text-xl font-bold text-white mb-4">📋 Bulk Import Attendance</h4>
+              
+              <div className="space-y-4">
+                {/* Subject Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Select Subject *
+                  </label>
+                  <select
+                    value={bulkImportData.subjectId}
+                    onChange={(e) => setBulkImportData({...bulkImportData, subjectId: e.target.value})}
+                    className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Choose a subject...</option>
+                    {subjects.map(subject => (
+                      <option key={subject.id} value={subject.id}>
+                        {subject.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Status Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Attendance Status *
+                  </label>
+                  <div className="grid grid-cols-3 gap-3">
+                    <button
+                      onClick={() => setBulkImportData({...bulkImportData, status: 'present'})}
+                      className={`py-3 px-4 rounded-lg font-medium transition-all ${
+                        bulkImportData.status === 'present'
+                          ? 'bg-green-600 text-white shadow-lg scale-105'
+                          : 'bg-gray-700 hover:bg-green-600 text-gray-200'
+                      }`}
+                    >
+                      ✓ Present
+                    </button>
+                    <button
+                      onClick={() => setBulkImportData({...bulkImportData, status: 'absent'})}
+                      className={`py-3 px-4 rounded-lg font-medium transition-all ${
+                        bulkImportData.status === 'absent'
+                          ? 'bg-red-600 text-white shadow-lg scale-105'
+                          : 'bg-gray-700 hover:bg-red-600 text-gray-200'
+                      }`}
+                    >
+                      ✗ Absent
+                    </button>
+                    <button
+                      onClick={() => setBulkImportData({...bulkImportData, status: 'holiday'})}
+                      className={`py-3 px-4 rounded-lg font-medium transition-all ${
+                        bulkImportData.status === 'holiday'
+                          ? 'bg-yellow-600 text-white shadow-lg scale-105'
+                          : 'bg-gray-700 hover:bg-yellow-600 text-gray-200'
+                      }`}
+                    >
+                      🏖️ Holiday
+                    </button>
+                  </div>
+                </div>
+
+                {/* Dates Input */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Enter Dates (one per line) *
+                  </label>
+                  <textarea
+                    value={bulkImportData.dates}
+                    onChange={(e) => setBulkImportData({...bulkImportData, dates: e.target.value})}
+                    placeholder="19-08-2025&#10;21-08-2025&#10;22-08-2025&#10;24-08-2025&#10;..."
+                    rows={12}
+                    className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                  />
+                  <p className="text-xs text-gray-400 mt-2">
+                    Format: DD-MM-YYYY (one date per line). Example: 19-08-2025
+                  </p>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex space-x-3">
+                  <button
+                    onClick={handleBulkImport}
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-colors"
+                  >
+                    Import {bulkImportData.dates.split('\n').filter(l => l.trim()).length} Records
+                  </button>
+                  <button
+                    onClick={() => setBulkImportData({ subjectId: '', dates: '', status: 'present' })}
+                    className="bg-gray-700 hover:bg-gray-600 text-gray-200 font-medium py-3 px-6 rounded-lg transition-colors"
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+
+              {/* Example Box */}
+              <div className="mt-6 bg-gray-900/50 border border-gray-700 rounded-lg p-4">
+                <h5 className="text-sm font-semibold text-yellow-400 mb-2">💡 Example Format</h5>
+                <pre className="text-xs text-gray-300 font-mono">
+19-08-2025{'\n'}21-08-2025{'\n'}22-08-2025{'\n'}24-08-2025{'\n'}26-08-2025
+                </pre>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Calendar */}
           <div>
             <h4 className="text-lg font-semibold text-white mb-4">Select Date</h4>
@@ -1279,35 +1439,73 @@ const DailyAttendanceModal: React.FC<{
                 onChange={(value) => onDateChange(value as Date)}
                 value={selectedDate}
                 className="react-calendar-dark"
+                maxDate={new Date()}
               />
+            </div>
+            
+            <div className="mt-4 bg-blue-900/30 border border-blue-600/50 rounded-lg p-4">
+              <h5 className="text-sm font-semibold text-blue-300 mb-2">💡 Pro Tip</h5>
+              <p className="text-xs text-gray-300">
+                You can mark attendance for past dates to feed historical data. 
+                This will automatically update your attendance graphs and statistics.
+              </p>
             </div>
           </div>
 
           {/* Subjects for selected date */}
           <div>
-            <h4 className="text-lg font-semibold text-white mb-4">
-              Subjects for {selectedDate.toLocaleDateString()} ({dayName})
-            </h4>
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-lg font-semibold text-white">
+                {selectedDate.toLocaleDateString('en-IN', { 
+                  weekday: 'short', 
+                  year: 'numeric', 
+                  month: 'short', 
+                  day: 'numeric' 
+                })}
+              </h4>
+              <button
+                onClick={() => setShowAllSubjects(!showAllSubjects)}
+                className="text-sm bg-gray-700 hover:bg-gray-600 text-gray-200 px-3 py-1 rounded-lg transition-colors"
+              >
+                {showAllSubjects ? `Scheduled (${subjectsForDay.length})` : `All Subjects (${subjects.length})`}
+              </button>
+            </div>
             
-            {subjectsForDay.length === 0 ? (
-              <p className="text-gray-400">No subjects scheduled for this day.</p>
+            {displaySubjects.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-gray-400 mb-2">No subjects {showAllSubjects ? '' : 'scheduled for this day'}.</p>
+                {!showAllSubjects && subjects.length > 0 && (
+                  <button
+                    onClick={() => setShowAllSubjects(true)}
+                    className="text-blue-400 hover:text-blue-300 text-sm underline"
+                  >
+                    Show all subjects anyway
+                  </button>
+                )}
+              </div>
             ) : (
-              <div className="space-y-4">
-                {subjectsForDay.map((subject) => {
+              <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
+                {displaySubjects.map((subject) => {
                   const attendanceRecord = getAttendanceForDate(subject.id, selectedDate);
+                  const isScheduled = subjectsForDay.some(s => s.id === subject.id);
                   
                   return (
                     <div key={subject.id} className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center space-x-3">
                           <div
-                            className="w-4 h-4 rounded-full"
+                            className="w-5 h-5 rounded-full"
                             style={{ backgroundColor: subject.color }}
                           />
-                          <span className="text-lg font-semibold text-white">{subject.name}</span>
+                          <div>
+                            <span className="text-lg font-semibold text-white">{subject.name}</span>
+                            {!isScheduled && showAllSubjects && (
+                              <span className="ml-2 text-xs text-gray-500">(Not scheduled)</span>
+                            )}
+                          </div>
                         </div>
                         {attendanceRecord && (
-                          <span className={`px-2 py-1 rounded text-sm font-medium ${
+                          <span className={`px-3 py-1 rounded-full text-xs font-bold ${
                             attendanceRecord.status === 'present' 
                               ? 'bg-green-600 text-white'
                               : attendanceRecord.status === 'absent'
@@ -1319,36 +1517,36 @@ const DailyAttendanceModal: React.FC<{
                         )}
                       </div>
 
-                      <div className="flex space-x-2">
+                      <div className="grid grid-cols-3 gap-2">
                         <button
                           onClick={() => onUpdateAttendance(subject.id, selectedDate, 'present')}
-                          className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${
+                          className={`py-2 px-3 rounded-lg font-medium transition-all ${
                             attendanceRecord?.status === 'present'
-                              ? 'bg-green-600 text-white'
+                              ? 'bg-green-600 text-white shadow-lg scale-105'
                               : 'bg-gray-600 hover:bg-green-600 text-gray-200 hover:text-white'
                           }`}
                         >
-                          Present
+                          ✓ Present
                         </button>
                         <button
                           onClick={() => onUpdateAttendance(subject.id, selectedDate, 'absent')}
-                          className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${
+                          className={`py-2 px-3 rounded-lg font-medium transition-all ${
                             attendanceRecord?.status === 'absent'
-                              ? 'bg-red-600 text-white'
+                              ? 'bg-red-600 text-white shadow-lg scale-105'
                               : 'bg-gray-600 hover:bg-red-600 text-gray-200 hover:text-white'
                           }`}
                         >
-                          Absent
+                          ✗ Absent
                         </button>
                         <button
                           onClick={() => onUpdateAttendance(subject.id, selectedDate, 'holiday')}
-                          className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${
+                          className={`py-2 px-3 rounded-lg font-medium transition-all ${
                             attendanceRecord?.status === 'holiday'
-                              ? 'bg-yellow-600 text-white'
+                              ? 'bg-yellow-600 text-white shadow-lg scale-105'
                               : 'bg-gray-600 hover:bg-yellow-600 text-gray-200 hover:text-white'
                           }`}
                         >
-                          Holiday
+                          🏖️ Holiday
                         </button>
                       </div>
                     </div>
@@ -1356,8 +1554,16 @@ const DailyAttendanceModal: React.FC<{
                 })}
               </div>
             )}
+            
+            {displaySubjects.length > 0 && (
+              <div className="mt-4 text-xs text-gray-500 text-center">
+                Showing {displaySubjects.length} subject{displaySubjects.length !== 1 ? 's' : ''}
+                {showAllSubjects ? ' (All)' : ` (Scheduled for ${dayName})`}
+              </div>
+            )}
           </div>
         </div>
+        )}
       </motion.div>
     </motion.div>
   );
