@@ -1262,14 +1262,23 @@ const DailyAttendanceModal: React.FC<{
         return;
       }
 
-      // Import all dates
-      let successCount = 0;
-      for (const date of parsedDates) {
-        await onUpdateAttendance(parseInt(bulkImportData.subjectId), date, bulkImportData.status);
-        successCount++;
+      // Import all dates sequentially
+      const subjectId = parseInt(bulkImportData.subjectId);
+      
+      for (let i = 0; i < parsedDates.length; i++) {
+        const date = parsedDates[i];
+        onUpdateAttendance(subjectId, date, bulkImportData.status);
+        
+        // Small delay to avoid overwhelming the API
+        if (i < parsedDates.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
       }
 
-      alert(`Successfully imported ${successCount} attendance records!`);
+      // Wait a bit for all requests to complete
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      alert(`Successfully imported ${parsedDates.length} attendance records! 🎉`);
       setBulkImportData({ subjectId: '', dates: '', status: 'present' });
       setShowBulkImport(false);
     } catch (error) {
