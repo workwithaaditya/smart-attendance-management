@@ -65,6 +65,35 @@ export default function HomePage() {
           {activeTab === 'timetable' && <AcademicCalendar />}
           {activeTab === 'predictor' && <HolidayPredictor />}
         </motion.div>
+
+        {/* Footer */}
+        <motion.footer
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5 }}
+          className="mt-12 pb-6 text-center"
+        >
+          <div className="text-gray-500 text-sm space-y-1">
+            <p>
+              Made with {' '}
+              <span className="text-gray-400">Claude Sonnet</span>
+            </p>
+            <p>
+              Created by{' '}
+              <a
+                href="https://github.com/workwithaaditya"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-gray-400 hover:text-blue-400 transition-colors underline"
+              >
+                @workwithaaditya
+              </a>
+            </p>
+            <p className="text-gray-600 text-xs">
+              © {new Date().getFullYear()} All rights reserved
+            </p>
+          </div>
+        </motion.footer>
       </div>
     </div>
   );
