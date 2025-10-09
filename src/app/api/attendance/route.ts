@@ -117,19 +117,26 @@ export async function DELETE(request: NextRequest) {
     }
     
     // Otherwise, expect body with single record delete (old behavior)
-    const body = await request.json()
-    const { subjectId: bodySubjectId, date } = body
+    try {
+      const body = await request.json()
+      const { subjectId: bodySubjectId, date } = body
 
-    await prisma.attendanceRecord.delete({
-      where: {
-        subjectId_date: {
-          subjectId: parseInt(bodySubjectId),
-          date: new Date(date)
+      await prisma.attendanceRecord.delete({
+        where: {
+          subjectId_date: {
+            subjectId: parseInt(bodySubjectId),
+            date: new Date(date)
+          }
         }
-      }
-    })
+      })
 
-    return NextResponse.json({ message: 'Attendance record deleted successfully' })
+      return NextResponse.json({ message: 'Attendance record deleted successfully' })
+    } catch (jsonError) {
+      return NextResponse.json(
+        { error: 'Invalid request: provide query params (subjectId & status) for bulk delete or body (subjectId & date) for single delete' },
+        { status: 400 }
+      )
+    }
   } catch (error) {
     console.error('Error deleting attendance record:', error)
     return NextResponse.json(
