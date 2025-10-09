@@ -1450,6 +1450,9 @@ const DailyAttendanceModal: React.FC<{
                 value={selectedDate}
                 className="react-calendar-dark"
                 maxDate={new Date()}
+                calendarType="gregory"
+                showNeighboringMonth={false}
+                locale="en-IN"
               />
             </div>
             
