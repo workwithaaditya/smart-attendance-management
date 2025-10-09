@@ -68,6 +68,7 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({ onSubjectUpdate }) 
   const [showDateAttendance, setShowDateAttendance] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showSubjectGraphs, setShowSubjectGraphs] = useState(false);
+  const [showPredictionPlanner, setShowPredictionPlanner] = useState(false);
 
   const daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
   const periods = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
@@ -799,6 +800,22 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({ onSubjectUpdate }) 
         )}
       </AnimatePresence>
 
+      {/* Prediction Planner Modal */}
+      <AnimatePresence>
+        {showPredictionPlanner && (
+          <PredictionPlannerModal
+            subjects={subjects}
+            timetableSlots={timetableSlots}
+            attendanceRecords={attendanceRecords}
+            onClose={() => setShowPredictionPlanner(false)}
+            onPlanHolidays={(holidays, subjectId) => {
+              // Optional: Auto-mark holidays in attendance
+              console.log('Planned holidays:', holidays, 'for subject:', subjectId);
+            }}
+          />
+        )}
+      </AnimatePresence>
+
       {/* Add Subject Modal */}
       <AnimatePresence>
         {showSubjectForm && (
@@ -1249,6 +1266,12 @@ const DailyAttendanceModal: React.FC<{
               }`}
             >
               📋 {showBulkImport ? 'Single Entry' : 'Bulk Import'}
+            </button>
+            <button
+              onClick={() => setShowPredictionPlanner(true)}
+              className="px-4 py-2 rounded-lg font-medium transition-all bg-purple-600 hover:bg-purple-700 text-white"
+            >
+              🔮 Future Planner
             </button>
             <button
               onClick={onClose}
@@ -1781,6 +1804,235 @@ const SubjectGraphsModal: React.FC<{
               </div>
             );
           })}
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+};
+
+// Prediction Planner Modal Component
+const PredictionPlannerModal: React.FC<{
+  subjects: Subject[];
+  timetableSlots: TimetableSlot[];
+  attendanceRecords: AttendanceRecord[];
+  onClose: () => void;
+  onPlanHolidays: (holidays: Date[], subjectId?: number) => void;
+}> = ({ subjects, timetableSlots, attendanceRecords, onClose, onPlanHolidays }) => {
+  const [selectedSubject, setSelectedSubject] = useState<string>('');
+  const [futureHolidays, setFutureHolidays] = useState<string>('');
+  const [predictions, setPredictions] = useState<any[]>([]);
+
+  const calculatePrediction = () => {
+    if (!selectedSubject) {
+      alert('Please select a subject');
+      return;
+    }
+
+    const subject = subjects.find(s => s.id.toString() === selectedSubject);
+    if (!subject) return;
+
+    // Parse holiday dates
+    const holidayDates = futureHolidays
+      .split('\n')
+      .filter(line => line.trim())
+      .map(line => {
+        const match = line.trim().match(/(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/);
+        if (match) {
+          const [, day, month, year] = match;
+          return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+        }
+        return null;
+      })
+      .filter(date => date !== null) as Date[];
+
+    // Get upcoming classes from timetable (next 30 days)
+    const today = new Date();
+    const next30Days = new Date();
+    next30Days.setDate(today.getDate() + 30);
+    
+    const subjectSlots = timetableSlots.filter(slot => slot.subjectId === subject.id);
+    const upcomingClasses: Date[] = [];
+    
+    for (let d = new Date(today); d <= next30Days; d.setDate(d.getDate() + 1)) {
+      const dayName = d.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+      const slotsOnDay = subjectSlots.filter(slot => slot.dayOfWeek === dayName);
+      
+      if (slotsOnDay.length > 0) {
+        // Check if this date is a holiday
+        const isHoliday = holidayDates.some(holiday => 
+          holiday.toDateString() === d.toDateString()
+        );
+        
+        if (!isHoliday) {
+          upcomingClasses.push(new Date(d));
+        }
+      }
+    }
+
+    // Calculate predictions
+    const currentAttended = subject.attendedClasses;
+    const currentTotal = subject.totalClasses;
+    const currentPercentage = currentTotal > 0 ? (currentAttended / currentTotal) * 100 : 0;
+    
+    const futureTotal = currentTotal + upcomingClasses.length;
+    const futureAttended = currentAttended + upcomingClasses.length; // Assuming all future classes attended
+    const futurePercentage = futureTotal > 0 ? (futureAttended / futureTotal) * 100 : 0;
+
+    setPredictions([{
+      subjectName: subject.name,
+      currentAttended,
+      currentTotal,
+      currentPercentage: currentPercentage.toFixed(2),
+      upcomingClasses: upcomingClasses.length,
+      holidaysPlanned: holidayDates.length,
+      futureAttended,
+      futureTotal,
+      futurePercentage: futurePercentage.toFixed(2),
+      percentageChange: (futurePercentage - currentPercentage).toFixed(2)
+    }]);
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        className="bg-gray-800 rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-purple-600"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h3 className="text-2xl font-bold text-white">🔮 Future Attendance Planner</h3>
+            <p className="text-sm text-gray-400 mt-1">Plan holidays and predict future attendance percentage</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-white text-2xl"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="space-y-6">
+          {/* Subject Selection */}
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Select Subject *
+            </label>
+            <select
+              value={selectedSubject}
+              onChange={(e) => setSelectedSubject(e.target.value)}
+              className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+            >
+              <option value="">Choose a subject...</option>
+              {subjects.map(subject => (
+                <option key={subject.id} value={subject.id.toString()}>
+                  {subject.name} - {subject.totalClasses > 0 
+                    ? `${((subject.attendedClasses / subject.totalClasses) * 100).toFixed(1)}%`
+                    : 'No data'}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Holiday Dates Input */}
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Future Holidays (One per line)
+            </label>
+            <textarea
+              value={futureHolidays}
+              onChange={(e) => setFutureHolidays(e.target.value)}
+              placeholder="DD-MM-YYYY&#10;25-12-2025&#10;01-01-2026"
+              className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono"
+              rows={5}
+            />
+            <p className="text-xs text-gray-400 mt-2">
+              💡 Enter holidays in DD-MM-YYYY format, one per line. These days will be excluded from upcoming classes calculation.
+            </p>
+          </div>
+
+          {/* Calculate Button */}
+          <button
+            onClick={calculatePrediction}
+            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg transition-colors"
+          >
+            🎯 Calculate Prediction
+          </button>
+
+          {/* Predictions Display */}
+          {predictions.length > 0 && (
+            <div className="bg-purple-900/20 border-2 border-purple-600/50 rounded-lg p-6 space-y-4">
+              {predictions.map((pred, index) => (
+                <div key={index} className="space-y-4">
+                  <h4 className="text-xl font-bold text-white">{pred.subjectName}</h4>
+                  
+                  {/* Current Status */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-gray-700/50 rounded-lg p-4">
+                      <p className="text-sm text-gray-400">Current Status</p>
+                      <p className="text-2xl font-bold text-white">{pred.currentPercentage}%</p>
+                      <p className="text-xs text-gray-400">{pred.currentAttended}/{pred.currentTotal} classes</p>
+                    </div>
+                    
+                    <div className="bg-gray-700/50 rounded-lg p-4">
+                      <p className="text-sm text-gray-400">Predicted (30 days)</p>
+                      <p className="text-2xl font-bold text-purple-400">{pred.futurePercentage}%</p>
+                      <p className="text-xs text-gray-400">{pred.futureAttended}/{pred.futureTotal} classes</p>
+                    </div>
+                  </div>
+
+                  {/* Details */}
+                  <div className="bg-gray-700/30 rounded-lg p-4 space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-gray-300">📅 Upcoming Classes (30 days):</span>
+                      <span className="text-white font-bold">{pred.upcomingClasses}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-300">🏖️ Holidays Planned:</span>
+                      <span className="text-white font-bold">{pred.holidaysPlanned}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-300">📊 Percentage Change:</span>
+                      <span className={`font-bold ${parseFloat(pred.percentageChange) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                        {parseFloat(pred.percentageChange) >= 0 ? '+' : ''}{pred.percentageChange}%
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Warning/Info Messages */}
+                  {parseFloat(pred.futurePercentage) < 75 && (
+                    <div className="bg-red-900/20 border border-red-600/50 rounded-lg p-4">
+                      <p className="text-red-400 text-sm">
+                        ⚠️ Warning: Predicted attendance is below 75%. Consider attending more classes or reducing holidays.
+                      </p>
+                    </div>
+                  )}
+                  {parseFloat(pred.futurePercentage) >= 75 && parseFloat(pred.futurePercentage) < 80 && (
+                    <div className="bg-yellow-900/20 border border-yellow-600/50 rounded-lg p-4">
+                      <p className="text-yellow-400 text-sm">
+                        ⚡ Your attendance is above 75% but close to the threshold. Stay consistent!
+                      </p>
+                    </div>
+                  )}
+                  {parseFloat(pred.futurePercentage) >= 80 && (
+                    <div className="bg-green-900/20 border border-green-600/50 rounded-lg p-4">
+                      <p className="text-green-400 text-sm">
+                        ✅ Excellent! Your attendance is healthy. Keep up the good work!
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </motion.div>
     </motion.div>

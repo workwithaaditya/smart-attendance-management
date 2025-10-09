@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,35 +8,30 @@ datasource db {
 }
 
 model Subject {
-  id               Int                @id @default(autoincrement())
-  name             String             @unique
-  color            String?            @default("#3B82F6") // Default blue color
-  totalClasses     Int                @default(0)
-  attendedClasses  Int                @default(0)
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
-  
-  // Relations
-  timetableSlots      TimetableSlot[]
-  attendanceRecords   AttendanceRecord[]
-  
+  id                Int                @id @default(autoincrement())
+  name              String             @unique
+  color             String?            @default("#3B82F6")
+  totalClasses      Int                @default(0)
+  attendedClasses   Int                @default(0)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  attendanceRecords AttendanceRecord[]
+  timetableSlots    TimetableSlot[]
+
   @@map("subjects")
 }
 
 model TimetableSlot {
   id          Int      @id @default(autoincrement())
-  dayOfWeek   String   // "monday", "tuesday", etc.
-  periodStart Int      // 1-8
-  periodEnd   Int      // 1-8 (same as periodStart unless merged)
+  dayOfWeek   String
+  periodStart Int
+  periodEnd   Int
   merged      Boolean  @default(false)
   subjectId   Int
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
-  // Relations
   subject     Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  
-  // Unique constraint to prevent overlapping slots
+
   @@unique([dayOfWeek, periodStart, periodEnd])
   @@map("timetable_slots")
 }
@@ -48,13 +40,11 @@ model AttendanceRecord {
   id        Int      @id @default(autoincrement())
   subjectId Int
   date      DateTime
-  status    String   // "present", "absent", "holiday"
-  count     Int      @default(1) // How many periods of this subject on this date
+  status    String
+  count     Int      @default(1)
   createdAt DateTime @default(now())
-  
-  // Relations
   subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  
+
   @@unique([subjectId, date])
   @@map("attendance_records")
 }
