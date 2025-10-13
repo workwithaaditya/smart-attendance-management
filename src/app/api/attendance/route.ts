@@ -1,12 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getUserId } from '@/lib/session'
 
 export async function GET(request: NextRequest) {
   try {
+    const userId = await getUserId();
     const { searchParams } = new URL(request.url)
     const subjectId = searchParams.get('subjectId')
     
     if (subjectId) {
+      // Verify subject belongs to user
+      const subject = await prisma.subject.findFirst({
+        where: { id: parseInt(subjectId), userId }
+      });
+
+      if (!subject) {
+        return NextResponse.json(
+          { error: 'Subject not found' },
+          { status: 404 }
+        )
+      }
+
       // Get attendance records for a specific subject
       const records = await prisma.attendanceRecord.findMany({
         where: { subjectId: parseInt(subjectId) },
@@ -15,8 +29,13 @@ export async function GET(request: NextRequest) {
       })
       return NextResponse.json(records)
     } else {
-      // Get all attendance records
+      // Get all attendance records for user's subjects
       const records = await prisma.attendanceRecord.findMany({
+        where: {
+          subject: {
+            userId
+          }
+        },
         include: { subject: true },
         orderBy: [{ subjectId: 'asc' }, { date: 'asc' }]
       })
@@ -24,6 +43,12 @@ export async function GET(request: NextRequest) {
     }
   } catch (error) {
     console.error('Error fetching attendance records:', error)
+    if ((error as Error).message === 'Unauthorized') {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
     return NextResponse.json(
       { error: 'Failed to fetch attendance records' },
       { status: 500 }
@@ -33,8 +58,21 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const userId = await getUserId();
     const body = await request.json()
     const { subjectId, date, status, replaceWith } = body
+
+    // Verify subject belongs to user
+    const subject = await prisma.subject.findFirst({
+      where: { id: parseInt(subjectId), userId }
+    });
+
+    if (!subject) {
+      return NextResponse.json(
+        { error: 'Subject not found' },
+        { status: 404 }
+      )
+    }
 
     // Get the day of week from the date
     const dateObj = new Date(date)
@@ -75,6 +113,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(record, { status: 201 })
   } catch (error) {
     console.error('Error creating attendance record:', error)
+    if ((error as Error).message === 'Unauthorized') {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
     return NextResponse.json(
       { error: 'Failed to create attendance record' },
       { status: 500 }
@@ -84,12 +128,25 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const userId = await getUserId();
     const { searchParams } = new URL(request.url)
     const subjectId = searchParams.get('subjectId')
     const status = searchParams.get('status') as 'present' | 'absent' | 'holiday' | 'all' | null
     
     // If both subjectId and status are provided, do bulk delete
     if (subjectId && status) {
+      // Verify subject belongs to user
+      const subject = await prisma.subject.findFirst({
+        where: { id: parseInt(subjectId), userId }
+      });
+
+      if (!subject) {
+        return NextResponse.json(
+          { error: 'Subject not found' },
+          { status: 404 }
+        )
+      }
+
       const whereCondition = status === 'all' 
         ? { subjectId: parseInt(subjectId) }
         : { subjectId: parseInt(subjectId), status };
@@ -121,6 +178,18 @@ export async function DELETE(request: NextRequest) {
       const body = await request.json()
       const { subjectId: bodySubjectId, date } = body
 
+      // Verify subject belongs to user
+      const subject = await prisma.subject.findFirst({
+        where: { id: parseInt(bodySubjectId), userId }
+      });
+
+      if (!subject) {
+        return NextResponse.json(
+          { error: 'Subject not found' },
+          { status: 404 }
+        )
+      }
+
       await prisma.attendanceRecord.delete({
         where: {
           subjectId_date: {
@@ -139,6 +208,12 @@ export async function DELETE(request: NextRequest) {
     }
   } catch (error) {
     console.error('Error deleting attendance record:', error)
+    if ((error as Error).message === 'Unauthorized') {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
     return NextResponse.json(
       { error: 'Failed to delete attendance record' },
       { status: 500 }
