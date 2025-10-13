@@ -372,9 +372,9 @@ const HolidayPredictor: React.FC = () => {
         {/* Calculate Button */}
         <button
           onClick={calculatePredictions}
-          className="w-full mt-6 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg transition-colors"
+          className="w-full mt-6 bg-purple-600 hover:bg-purple-700 text-white font-medium py-3 px-6 rounded-lg transition-colors"
         >
-          🎯 Calculate Month-End Predictions
+          Calculate Month-End Predictions
         </button>
       </motion.div>
 
@@ -385,7 +385,7 @@ const HolidayPredictor: React.FC = () => {
           animate={{ opacity: 1, y: 0 }}
           className="bg-gray-800 rounded-lg p-6 space-y-4"
         >
-          <h3 className="text-2xl font-bold text-white mb-4">📊 Subject-wise Predictions</h3>
+          <h3 className="text-2xl font-semibold text-white mb-4">Subject-wise Predictions</h3>
           
           <div className="grid md:grid-cols-2 gap-4">
             {predictions.map((pred, index) => (
@@ -437,7 +437,7 @@ const HolidayPredictor: React.FC = () => {
                 {/* Warning */}
                 {pred.futurePercentage < 75 && (
                   <div className="mt-3 bg-red-900/30 border border-red-600/50 rounded p-2 text-xs text-red-300">
-                    ⚠️ Below 75% threshold!
+                    Below 75% threshold
                   </div>
                 )}
               </div>
@@ -446,7 +446,7 @@ const HolidayPredictor: React.FC = () => {
 
           {/* Summary Stats */}
           <div className="bg-gradient-to-r from-purple-900/20 to-blue-900/20 border border-purple-600/30 rounded-lg p-4 mt-4">
-            <h4 className="font-bold text-white mb-2">📈 Summary</h4>
+            <h4 className="font-semibold text-white mb-2">Summary</h4>
             <div className="grid grid-cols-3 gap-4 text-center">
               <div>
                 <p className="text-sm text-gray-400">College Holidays</p>

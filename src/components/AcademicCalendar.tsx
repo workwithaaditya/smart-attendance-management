@@ -515,13 +515,13 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({ onSubjectUpdate }) 
             onClick={() => setShowDateAttendance(true)}
             className="bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 shadow-lg"
           >
-            📅 Daily Attendance
+            Daily Attendance
           </button>
           <button
             onClick={() => setShowSubjectGraphs(true)}
             className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 shadow-lg"
           >
-            📈 Subject Graphs
+            Subject Graphs
           </button>
           <button
             onClick={() => setShowSubjectForm(true)}
@@ -1077,10 +1077,10 @@ const DailyAttendanceModal: React.FC<{
       onUpdateAttendance(parseInt(subjectId), new Date(), 'present');
       
       const count = result.count || 0;
-      alert(`✅ Successfully deleted ${count} record(s) (${statusText}) for ${subject.name}`);
+      alert(`Successfully deleted ${count} record(s) (${statusText}) for ${subject.name}`);
     } catch (error) {
       console.error('Error deleting records:', error);
-      alert(`❌ Error: ${error instanceof Error ? error.message : 'Could not delete records'}`);
+      alert(`Error: ${error instanceof Error ? error.message : 'Could not delete records'}`);
     }
   };
 
@@ -1193,7 +1193,7 @@ const DailyAttendanceModal: React.FC<{
       onUpdateAttendance(subjectId, new Date(), bulkImportData.status); // Trigger refresh
       
       const duplicateInfo = uniqueDates.filter(([, count]) => count > 1).length > 0 
-        ? `\n\n📊 Smart Count Applied:\n${uniqueDates.filter(([, count]) => count > 1).map(([date, count]) => {
+        ? `\n\nSmart Count Applied:\n${uniqueDates.filter(([, count]) => count > 1).map(([date, count]) => {
             const d = new Date(date);
             const day = d.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
             const periods = timetableSlots?.filter(s => s.subjectId === subjectId && s.dayOfWeek === day).length || 1;
@@ -1202,9 +1202,9 @@ const DailyAttendanceModal: React.FC<{
         : '';
       
       if (failedDates.length > 0) {
-        alert(`⚠️ Partially imported: ${totalImported} succeeded, ${failedDates.length} failed\n\nFailed dates: ${failedDates.slice(0, 5).join(', ')}${failedDates.length > 5 ? '...' : ''}`);
+        alert(`Partially imported: ${totalImported} succeeded, ${failedDates.length} failed\n\nFailed dates: ${failedDates.slice(0, 5).join(', ')}${failedDates.length > 5 ? '...' : ''}`);
       } else {
-        alert(`✅ Successfully imported ${totalImported} date(s)! 🎉${duplicateInfo}`);
+        alert(`Successfully imported ${totalImported} date(s)!${duplicateInfo}`);
       }
       
       setBulkImportData({ subjectId: '', dates: '', status: 'present' });
@@ -1415,7 +1415,7 @@ const DailyAttendanceModal: React.FC<{
 
               {/* Example Box */}
               <div className="mt-6 bg-gray-900/50 border border-gray-700 rounded-lg p-4">
-                <h5 className="text-sm font-semibold text-yellow-400 mb-2">💡 Smart Duplicate Handling</h5>
+                <h5 className="text-sm font-semibold text-yellow-400 mb-2">Smart Duplicate Handling</h5>
                 <div className="text-xs text-gray-300 space-y-2">
                   <p><strong>Example 1:</strong> If you enter same date 2 times + that day has 3 periods:</p>
                   <pre className="bg-gray-800 p-2 rounded font-mono">
@@ -1449,7 +1449,7 @@ const DailyAttendanceModal: React.FC<{
             </div>
             
             <div className="mt-4 bg-blue-900/30 border border-blue-600/50 rounded-lg p-4">
-              <h5 className="text-sm font-semibold text-blue-300 mb-2">💡 Pro Tip</h5>
+              <h5 className="text-sm font-semibold text-blue-300 mb-2">Pro Tip</h5>
               <p className="text-xs text-gray-300">
                 You can mark attendance for past dates to feed historical data. 
                 This will automatically update your attendance graphs and statistics.
@@ -1680,7 +1680,7 @@ const SubjectGraphsModal: React.FC<{
       >
         <div className="flex justify-between items-center mb-8 sticky top-0 bg-gray-800 z-10 pb-4">
           <div>
-            <h3 className="text-3xl font-bold text-white">📊 Subject-wise Attendance Trends</h3>
+            <h3 className="text-3xl font-semibold text-white">Subject-wise Attendance Trends</h3>
             <p className="text-sm text-gray-400 mt-1">Scroll down to see all subjects • Recent trends shown</p>
           </div>
           <button
@@ -1769,7 +1769,7 @@ const SubjectGraphsModal: React.FC<{
                     </div>
                     {stats.recordCount > 15 && (
                       <div className="text-center text-sm text-gray-400 mb-4">
-                        📊 Showing recent {chartData.labels.length} classes • Total: {stats.recordCount} records
+                        Showing recent {chartData.labels.length} classes • Total: {stats.recordCount} records
                       </div>
                     )}
                   </div>

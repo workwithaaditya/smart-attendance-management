@@ -15,12 +15,12 @@ export default function HomePage() {
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-8"
+          className="text-center mb-12"
         >
-          <h1 className="text-4xl font-bold text-white mb-2">
+          <h1 className="text-5xl font-light tracking-tight text-white mb-3">
             Smart Attendance Management
           </h1>
-          <p className="text-gray-300 text-lg">
+          <p className="text-gray-400 text-base font-light">
             Manage your academic schedule and track attendance with intelligent insights
           </p>
         </motion.div>
@@ -30,28 +30,28 @@ export default function HomePage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="flex justify-center mb-6"
+          className="flex justify-center mb-8"
         >
-          <div className="bg-gray-800 rounded-lg p-1 flex gap-2">
+          <div className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-1 flex gap-1 border border-gray-700/50">
             <button
               onClick={() => setActiveTab('timetable')}
-              className={`px-6 py-3 rounded-lg font-medium transition-all ${
+              className={`px-8 py-3 rounded-md font-medium transition-all duration-200 ${
                 activeTab === 'timetable'
-                  ? 'bg-blue-600 text-white shadow-lg'
-                  : 'text-gray-400 hover:text-white hover:bg-gray-700'
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
               }`}
             >
-              📅 Timetable & Attendance
+              Timetable & Attendance
             </button>
             <button
               onClick={() => setActiveTab('predictor')}
-              className={`px-6 py-3 rounded-lg font-medium transition-all ${
+              className={`px-8 py-3 rounded-md font-medium transition-all duration-200 ${
                 activeTab === 'predictor'
-                  ? 'bg-purple-600 text-white shadow-lg'
-                  : 'text-gray-400 hover:text-white hover:bg-gray-700'
+                  ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/20'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
               }`}
             >
-              🔮 Holiday & Attendance Predictor
+              Attendance Predictor
             </button>
           </div>
         </motion.div>
@@ -71,20 +71,19 @@ export default function HomePage() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.5 }}
-          className="mt-12 pb-6 text-center"
+          className="mt-16 pb-8 text-center border-t border-gray-800/50 pt-8"
         >
-          <div className="text-gray-500 text-sm space-y-1">
+          <div className="text-gray-500 text-sm space-y-2 font-light">
             <p>
-              Made with {' '}
-              <span className="text-gray-400">Claude Sonnet</span>
+              Built with <span className="text-gray-400">Claude Sonnet</span>
             </p>
             <p>
-              Created by{' '}
+              Developed by{' '}
               <a
                 href="https://github.com/workwithaaditya"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-gray-400 hover:text-blue-400 transition-colors underline"
+                className="text-gray-400 hover:text-blue-400 transition-colors"
               >
                 @workwithaaditya
               </a>
