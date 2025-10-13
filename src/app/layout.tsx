@@ -8,6 +8,13 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: 'Smart Attendance Management',
   description: 'Track and predict your attendance percentage with smart planning tools',
+  keywords: ['attendance', 'tracker', 'management', 'student', 'academic', 'calendar'],
+  authors: [{ name: 'Aaditya Negi', url: 'https://github.com/workwithaaditya' }],
+  openGraph: {
+    title: 'Smart Attendance Management',
+    description: 'Track and predict your attendance percentage with smart planning tools',
+    type: 'website',
+  },
 }
 
 export default function RootLayout({
