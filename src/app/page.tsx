@@ -36,14 +36,14 @@ export default function HomePage() {
               Smart Attendance Management
             </h1>
             <p className="text-gray-400 text-sm">
-              Track and predict your attendance with intelligent insights
+              Track your attendance
             </p>
           </div>
 
           <div className="mb-8">
             <div className="bg-blue-900/20 border border-blue-600/30 rounded-lg p-4 mb-4">
               <p className="text-sm text-blue-300">
-                Sign in to access your personal attendance tracker
+                Sign in to continue
               </p>
             </div>
           </div>
@@ -117,7 +117,7 @@ export default function HomePage() {
             Smart Attendance Management
           </h1>
           <p className="text-gray-400 text-base font-light">
-            Manage your academic schedule and track attendance with intelligent insights
+            Manage your academic schedule and track attendance
           </p>
         </motion.div>
 
