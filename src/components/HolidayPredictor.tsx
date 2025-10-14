@@ -296,23 +296,17 @@ const HolidayPredictor: React.FC = () => {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-gradient-to-r from-purple-900/30 to-blue-900/30 border-2 border-purple-600/50 rounded-lg p-6"
+        className="bg-gradient-to-r from-purple-900/30 to-blue-900/30 border-2 border-purple-600/50 rounded-lg p-4"
       >
-        <h3 className="text-xl font-bold text-white mb-3">📋 How to Use</h3>
+        <h3 className="text-lg font-semibold text-white mb-3">How to Use</h3>
         <div className="grid md:grid-cols-2 gap-4 text-sm text-gray-300">
-          <div className="flex items-start gap-2">
-            <span className="text-red-400">🔴</span>
-            <div>
-              <strong className="text-white">Left Click</strong> - Mark as College Holiday
-              <p className="text-xs text-gray-400">College is closed, no classes scheduled</p>
-            </div>
+          <div className="flex items-center gap-2">
+            <span className="w-3 h-3 rounded-full bg-red-500"></span>
+            <span><strong className="text-white">Left Click</strong> - Mark as College Holiday</span>
           </div>
-          <div className="flex items-start gap-2">
-            <span className="text-orange-400">🟠</span>
-            <div>
-              <strong className="text-white">Right Click</strong> - Mark as Personal Leave
-              <p className="text-xs text-gray-400">You're taking leave, classes will count as absent</p>
-            </div>
+          <div className="flex items-center gap-2">
+            <span className="w-3 h-3 rounded-full bg-orange-500"></span>
+            <span><strong className="text-white">Right Click</strong> - Mark as Personal Leave</span>
           </div>
         </div>
       </motion.div>
@@ -372,12 +366,12 @@ const HolidayPredictor: React.FC = () => {
                 </div>
                 {isCollegeHoliday && (
                   <div className="text-xs bg-red-600 text-white px-1 py-0.5 rounded">
-                    🔴 Holiday
+                    Holiday
                   </div>
                 )}
                 {isPersonalLeave && (
                   <div className="text-xs bg-orange-600 text-white px-1 py-0.5 rounded">
-                    🟠 Leave
+                    Leave
                   </div>
                 )}
               </div>
