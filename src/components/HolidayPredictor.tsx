@@ -39,6 +39,8 @@ const HolidayPredictor: React.FC = () => {
   const [collegeHolidays, setCollegeHolidays] = useState<Set<string>>(new Set());
   const [personalLeaves, setPersonalLeaves] = useState<Set<string>>(new Set());
   const [predictions, setPredictions] = useState<any[]>([]);
+  const [targetDate, setTargetDate] = useState<string>('');
+  const [showPrediction, setShowPrediction] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -138,9 +140,20 @@ const HolidayPredictor: React.FC = () => {
   };
 
   const calculatePredictions = () => {
-    const year = selectedMonth.getFullYear();
-    const month = selectedMonth.getMonth();
-    const lastDay = new Date(year, month + 1, 0).getDate();
+    if (!targetDate) {
+      alert('Please select a target date');
+      return;
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const endDate = new Date(targetDate);
+    endDate.setHours(0, 0, 0, 0);
+
+    if (endDate <= today) {
+      alert('Please select a future date');
+      return;
+    }
     
     const subjectPredictions = subjects.map(subject => {
       const subjectSlots = timetableSlots.filter(slot => slot.subjectId === subject.id);
@@ -161,15 +174,15 @@ const HolidayPredictor: React.FC = () => {
         }
       });
       
-      // Calculate future classes for selected month
-      let totalClassesInMonth = 0;
+      // Calculate future classes from today to target date
+      let totalClassesInPeriod = 0;
       let attendedClasses = 0;
       
-      // Calculate for each day in the month
-      for (let day = 1; day <= lastDay; day++) {
-        const date = new Date(year, month, day);
-        const dateKey = formatDateKey(date);
-        const dayName = date.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+      // Calculate for each day from today to target date
+      const currentDate = new Date(today);
+      while (currentDate <= endDate) {
+        const dateKey = formatDateKey(currentDate);
+        const dayName = currentDate.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
         
         // Count classes for this subject on this day
         const classesOnDay = subjectSlots.filter(slot => slot.dayOfWeek === dayName).length;
@@ -178,23 +191,25 @@ const HolidayPredictor: React.FC = () => {
           // Check if it's a college holiday or personal leave
           if (collegeHolidays.has(dateKey)) {
             // College holiday - no classes
-            continue;
+            // Do nothing
           } else if (personalLeaves.has(dateKey)) {
             // Personal leave - classes happen but you're absent
-            totalClassesInMonth += classesOnDay;
+            totalClassesInPeriod += classesOnDay;
           } else {
             // Normal day - assume present
-            totalClassesInMonth += classesOnDay;
+            totalClassesInPeriod += classesOnDay;
             attendedClasses += classesOnDay;
           }
         }
+        
+        currentDate.setDate(currentDate.getDate() + 1);
       }
       
       const currentAttended = actualAttendedClasses;
       const currentTotal = actualTotalClasses;
       const currentPercentage = currentTotal > 0 ? (currentAttended / currentTotal) * 100 : 0;
       
-      const futureTotal = currentTotal + totalClassesInMonth;
+      const futureTotal = currentTotal + totalClassesInPeriod;
       const futureAttended = currentAttended + attendedClasses;
       const futurePercentage = futureTotal > 0 ? (futureAttended / futureTotal) * 100 : 0;
       
@@ -203,9 +218,9 @@ const HolidayPredictor: React.FC = () => {
         currentAttended,
         currentTotal,
         currentPercentage,
-        classesInMonth: totalClassesInMonth,
-        attendedInMonth: attendedClasses,
-        missedInMonth: totalClassesInMonth - attendedClasses,
+        classesInPeriod: totalClassesInPeriod,
+        attendedInPeriod: attendedClasses,
+        missedInPeriod: totalClassesInPeriod - attendedClasses,
         futureTotal,
         futureAttended,
         futurePercentage,
@@ -214,6 +229,7 @@ const HolidayPredictor: React.FC = () => {
     });
     
     setPredictions(subjectPredictions);
+    setShowPrediction(true);
   };
 
   const monthNames = [
@@ -369,23 +385,47 @@ const HolidayPredictor: React.FC = () => {
           })}
         </div>
 
+        {/* Target Date Selector */}
+        <div className="mt-6">
+          <label className="block text-sm font-medium text-gray-300 mb-2">
+            Select Target Date
+          </label>
+          <input
+            type="date"
+            value={targetDate}
+            onChange={(e) => setTargetDate(e.target.value)}
+            min={new Date().toISOString().split('T')[0]}
+            className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+          />
+          <p className="text-xs text-gray-400 mt-2">
+            Predictions will calculate from today to this date, considering marked holidays and leaves
+          </p>
+        </div>
+
         {/* Calculate Button */}
         <button
           onClick={calculatePredictions}
-          className="w-full mt-6 bg-purple-600 hover:bg-purple-700 text-white font-medium py-3 px-6 rounded-lg transition-colors"
+          disabled={!targetDate}
+          className={`w-full mt-6 font-medium py-3 px-6 rounded-lg transition-colors ${
+            targetDate
+              ? 'bg-purple-600 hover:bg-purple-700 text-white'
+              : 'bg-gray-700 text-gray-500 cursor-not-allowed'
+          }`}
         >
-          Calculate Month-End Predictions
+          Calculate Predictions to {targetDate ? new Date(targetDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Selected Date'}
         </button>
       </motion.div>
 
       {/* Predictions Display */}
-      {predictions.length > 0 && (
+      {showPrediction && predictions.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="bg-gray-800 rounded-lg p-6 space-y-4"
         >
-          <h3 className="text-2xl font-semibold text-white mb-4">Subject-wise Predictions</h3>
+          <h3 className="text-2xl font-semibold text-white mb-4">
+            Predictions to {new Date(targetDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+          </h3>
           
           <div className="grid md:grid-cols-2 gap-4">
             {predictions.map((pred, index) => (
@@ -404,7 +444,7 @@ const HolidayPredictor: React.FC = () => {
                     <p className="text-xs text-gray-400">{pred.currentAttended}/{pred.currentTotal}</p>
                   </div>
                   <div className="bg-gray-900/50 rounded-lg p-3">
-                    <p className="text-xs text-gray-400">After Month</p>
+                    <p className="text-xs text-gray-400">By Target Date</p>
                     <p className="text-2xl font-bold" style={{ color: pred.subject.color }}>
                       {pred.futurePercentage.toFixed(1)}%
                     </p>
@@ -415,16 +455,16 @@ const HolidayPredictor: React.FC = () => {
                 {/* Stats */}
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-gray-300">Classes in month:</span>
-                    <span className="text-white font-bold">{pred.classesInMonth}</span>
+                    <span className="text-gray-300">Classes till date:</span>
+                    <span className="text-white font-bold">{pred.classesInPeriod}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-300">Will attend:</span>
-                    <span className="text-green-400 font-bold">{pred.attendedInMonth}</span>
+                    <span className="text-green-400 font-bold">{pred.attendedInPeriod}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-300">Will miss:</span>
-                    <span className="text-red-400 font-bold">{pred.missedInMonth}</span>
+                    <span className="text-red-400 font-bold">{pred.missedInPeriod}</span>
                   </div>
                   <div className="flex justify-between pt-2 border-t border-gray-600">
                     <span className="text-gray-300">Change:</span>

@@ -1536,8 +1536,6 @@ const SubjectGraphsModal: React.FC<{
   getSubjectChartData: (subjectId: number) => any;
 }> = ({ subjects, attendanceRecords, onClose, getSubjectChartData }) => {
   const [showOverview, setShowOverview] = useState(true);
-  const [predictDate, setPredictDate] = useState('');
-  const [predictResults, setPredictResults] = useState<any[]>([]);
   
   // Calculate statistics for a subject
   const getSubjectStats = (subjectId: number) => {
@@ -1557,64 +1555,6 @@ const SubjectGraphsModal: React.FC<{
       percentage,
       recordCount: records.filter(r => r.status !== 'holiday').length
     };
-  };
-
-  // Predict attendance for a specific date
-  const handlePredictToDate = () => {
-    if (!predictDate) {
-      alert('Please select a date');
-      return;
-    }
-
-    const targetDate = new Date(predictDate);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    if (targetDate <= today) {
-      alert('Please select a future date');
-      return;
-    }
-
-    const results = subjects.map(subject => {
-      const stats = getSubjectStats(subject.id);
-      const currentPercentage = stats.percentage;
-      
-      // Calculate working days between now and target date (excluding Sundays)
-      let workingDays = 0;
-      const current = new Date(today);
-      while (current < targetDate) {
-        current.setDate(current.getDate() + 1);
-        if (current.getDay() !== 0) { // Not Sunday
-          workingDays++;
-        }
-      }
-
-      // Estimate classes needed (assume 1 class per working day)
-      const estimatedClasses = workingDays;
-      
-      // Scenarios
-      const allPresent = ((stats.totalPresent + estimatedClasses) / (stats.totalClasses + estimatedClasses)) * 100;
-      const allAbsent = (stats.totalPresent / (stats.totalClasses + estimatedClasses)) * 100;
-      const currentTrend = currentPercentage; // If trend continues
-      
-      // Classes needed to reach 75%
-      const classesFor75 = stats.totalClasses > 0
-        ? Math.max(0, Math.ceil((0.75 * stats.totalClasses - stats.totalPresent) / 0.25))
-        : 0;
-
-      return {
-        subject,
-        current: currentPercentage,
-        allPresent,
-        allAbsent,
-        estimatedClasses,
-        classesFor75,
-        workingDays,
-        stats
-      };
-    });
-
-    setPredictResults(results);
   };
 
   const chartOptions = {
@@ -1785,82 +1725,6 @@ const SubjectGraphsModal: React.FC<{
                   );
                 })}
               </div>
-            </div>
-
-            {/* Predict to Date */}
-            <div className="bg-gray-700/30 rounded-lg p-6">
-              <h4 className="text-lg font-semibold text-white mb-4">Predict Attendance to Date</h4>
-              <div className="flex gap-3 mb-4">
-                <input
-                  type="date"
-                  value={predictDate}
-                  onChange={(e) => setPredictDate(e.target.value)}
-                  min={new Date().toISOString().split('T')[0]}
-                  className="flex-1 px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-                />
-                <button
-                  onClick={handlePredictToDate}
-                  className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium"
-                >
-                  Predict
-                </button>
-              </div>
-
-              {predictResults.length > 0 && (
-                <div className="space-y-3">
-                  {predictResults.map(result => (
-                    <div key={result.subject.id} className="bg-gray-800/50 rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center space-x-2">
-                          <div
-                            className="w-3 h-3 rounded-full"
-                            style={{ backgroundColor: result.subject.color }}
-                          />
-                          <span className="font-medium text-white">{result.subject.name}</span>
-                        </div>
-                        <span className="text-sm text-gray-400">
-                          {result.workingDays} working days • ~{result.estimatedClasses} classes
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-4 gap-3 text-center">
-                        <div>
-                          <div className="text-xs text-gray-400 mb-1">Current</div>
-                          <div className={`text-lg font-bold ${
-                            result.current >= 75 ? 'text-green-400' :
-                            result.current >= 60 ? 'text-yellow-400' : 'text-red-400'
-                          }`}>
-                            {result.current.toFixed(1)}%
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-xs text-gray-400 mb-1">All Present</div>
-                          <div className={`text-lg font-bold ${
-                            result.allPresent >= 75 ? 'text-green-400' :
-                            result.allPresent >= 60 ? 'text-yellow-400' : 'text-red-400'
-                          }`}>
-                            {result.allPresent.toFixed(1)}%
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-xs text-gray-400 mb-1">All Absent</div>
-                          <div className={`text-lg font-bold ${
-                            result.allAbsent >= 75 ? 'text-green-400' :
-                            result.allAbsent >= 60 ? 'text-yellow-400' : 'text-red-400'
-                          }`}>
-                            {result.allAbsent.toFixed(1)}%
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-xs text-gray-400 mb-1">Need for 75%</div>
-                          <div className="text-lg font-bold text-blue-400">
-                            {result.classesFor75} classes
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
         ) : (
