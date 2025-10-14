@@ -427,38 +427,51 @@ const HolidayPredictor: React.FC = () => {
             Predictions to {new Date(targetDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
           </h3>
           
-          {/* Individual Subject Cards - Minimal Single Color */}
+          {/* Individual Subject Cards - With Colors */}
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
             {predictions.map((pred, index) => (
               <div
                 key={index}
-                className="bg-gray-700/30 border border-gray-600 rounded-lg p-4 hover:border-gray-500 transition-colors"
+                className="bg-gray-700/30 border-2 rounded-lg p-4 hover:shadow-lg transition-all"
+                style={{ borderColor: pred.subject.color || '#3B82F6' }}
               >
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="text-base font-semibold text-white">{pred.subject.name}</h4>
                   <div className="text-right">
                     <div className="text-xs text-gray-400">Current</div>
-                    <div className="text-lg font-bold text-white">{pred.currentPercentage.toFixed(1)}%</div>
+                    <div className={`text-lg font-bold ${
+                      pred.currentPercentage >= 75 ? 'text-green-400' :
+                      pred.currentPercentage >= 60 ? 'text-yellow-400' : 'text-red-400'
+                    }`}>
+                      {pred.currentPercentage.toFixed(1)}%
+                    </div>
                   </div>
                 </div>
                 
                 <div className="space-y-1.5 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-400">By Target Date</span>
-                    <span className="font-semibold text-white">{pred.futurePercentage.toFixed(1)}%</span>
+                    <span className={`font-semibold ${
+                      pred.futurePercentage >= 75 ? 'text-green-400' :
+                      pred.futurePercentage >= 60 ? 'text-yellow-400' : 'text-red-400'
+                    }`}>
+                      {pred.futurePercentage.toFixed(1)}%
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-400">Will Attend</span>
-                    <span className="text-white">{pred.attendedInPeriod}</span>
+                    <span className="text-green-400 font-semibold">{pred.attendedInPeriod}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-400">Will Miss</span>
-                    <span className="text-white">{pred.missedInPeriod}</span>
+                    <span className="text-red-400 font-semibold">{pred.missedInPeriod}</span>
                   </div>
                   <div className="flex justify-between pt-1.5 border-t border-gray-600">
                     <span className="text-gray-400">Change</span>
-                    <span className="font-semibold text-white">
-                      {pred.percentageChange >= 0 ? '+' : ''}{pred.percentageChange.toFixed(1)}%
+                    <span className={`font-semibold ${
+                      pred.percentageChange >= 0 ? 'text-green-400' : 'text-red-400'
+                    }`}>
+                      {pred.percentageChange >= 0 ? '↑ +' : '↓ '}{Math.abs(pred.percentageChange).toFixed(1)}%
                     </span>
                   </div>
                 </div>
@@ -474,28 +487,32 @@ const HolidayPredictor: React.FC = () => {
             <div className="grid grid-cols-4 gap-4 mb-6">
               <div className="text-center">
                 <div className="text-xs text-gray-400 mb-1">Total Classes</div>
-                <div className="text-2xl font-bold text-white">
+                <div className="text-2xl font-bold text-blue-400">
                   {predictions.reduce((sum, p) => sum + p.classesInPeriod, 0)}
                 </div>
               </div>
               <div className="text-center">
                 <div className="text-xs text-gray-400 mb-1">Will Attend</div>
-                <div className="text-2xl font-bold text-white">
+                <div className="text-2xl font-bold text-green-400">
                   {predictions.reduce((sum, p) => sum + p.attendedInPeriod, 0)}
                 </div>
               </div>
               <div className="text-center">
                 <div className="text-xs text-gray-400 mb-1">Will Miss</div>
-                <div className="text-2xl font-bold text-white">
+                <div className="text-2xl font-bold text-red-400">
                   {predictions.reduce((sum, p) => sum + p.missedInPeriod, 0)}
                 </div>
               </div>
               <div className="text-center">
                 <div className="text-xs text-gray-400 mb-1">Avg Change</div>
-                <div className="text-2xl font-bold text-white">
+                <div className={`text-2xl font-bold ${
+                  predictions.length > 0 && (predictions.reduce((sum, p) => sum + p.percentageChange, 0) / predictions.length) >= 0
+                    ? 'text-green-400'
+                    : 'text-red-400'
+                }`}>
                   {predictions.length > 0 
-                    ? ((predictions.reduce((sum, p) => sum + p.percentageChange, 0) / predictions.length) >= 0 ? '+' : '')
-                    + (predictions.reduce((sum, p) => sum + p.percentageChange, 0) / predictions.length).toFixed(1)
+                    ? ((predictions.reduce((sum, p) => sum + p.percentageChange, 0) / predictions.length) >= 0 ? '↑ +' : '↓ ')
+                    + Math.abs(predictions.reduce((sum, p) => sum + p.percentageChange, 0) / predictions.length).toFixed(1)
                     : '0.0'}%
                 </div>
               </div>
@@ -513,14 +530,29 @@ const HolidayPredictor: React.FC = () => {
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-300 font-medium">{pred.subject.name}</span>
                       <span className="text-gray-400">
-                        {pred.currentPercentage.toFixed(1)}% → {pred.futurePercentage.toFixed(1)}%
+                        <span className={
+                          pred.currentPercentage >= 75 ? 'text-green-400' :
+                          pred.currentPercentage >= 60 ? 'text-yellow-400' : 'text-red-400'
+                        }>
+                          {pred.currentPercentage.toFixed(1)}%
+                        </span>
+                        {' → '}
+                        <span className={
+                          pred.futurePercentage >= 75 ? 'text-green-400' :
+                          pred.futurePercentage >= 60 ? 'text-yellow-400' : 'text-red-400'
+                        }>
+                          {pred.futurePercentage.toFixed(1)}%
+                        </span>
                       </span>
                     </div>
                     <div className="flex gap-2 items-center">
                       {/* Current Bar */}
                       <div className="flex-1 bg-gray-700 rounded-full h-6 overflow-hidden">
                         <div 
-                          className="bg-gray-500 h-full flex items-center justify-end px-2 transition-all duration-500"
+                          className={`h-full flex items-center justify-end px-2 transition-all duration-500 ${
+                            pred.currentPercentage >= 75 ? 'bg-green-500/70' :
+                            pred.currentPercentage >= 60 ? 'bg-yellow-500/70' : 'bg-red-500/70'
+                          }`}
                           style={{ width: `${currentWidth}%` }}
                         >
                           {currentWidth > 15 && (
@@ -534,7 +566,10 @@ const HolidayPredictor: React.FC = () => {
                       {/* Future Bar */}
                       <div className="flex-1 bg-gray-700 rounded-full h-6 overflow-hidden">
                         <div 
-                          className="bg-blue-500 h-full flex items-center justify-end px-2 transition-all duration-500"
+                          className={`h-full flex items-center justify-end px-2 transition-all duration-500 ${
+                            pred.futurePercentage >= 75 ? 'bg-green-500' :
+                            pred.futurePercentage >= 60 ? 'bg-yellow-500' : 'bg-red-500'
+                          }`}
                           style={{ width: `${futureWidth}%` }}
                         >
                           {futureWidth > 15 && (
