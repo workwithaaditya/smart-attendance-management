@@ -96,14 +96,16 @@ model TimetableSlot {
 }
 
 model AttendanceRecord {
-  id        Int      @id @default(autoincrement())
-  subjectId Int
-  date      DateTime
-  status    String
-  count     Int      @default(1)
-  createdAt DateTime @default(now())
-  subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  id          Int      @id @default(autoincrement())
+  subjectId   Int
+  date        DateTime
+  periodStart Int?     // Which period started (e.g., 1, 7)
+  periodEnd   Int?     // Which period ended (e.g., 2, 8)
+  status      String   // "present", "absent", "holiday"
+  count       Int      @default(1)
+  createdAt   DateTime @default(now())
+  subject     Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
 
-  @@unique([subjectId, date])
+  @@unique([subjectId, date, periodStart, periodEnd])
   @@map("attendance_records")
 }
