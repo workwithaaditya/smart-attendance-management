@@ -1073,11 +1073,11 @@ const DailyAttendanceModal: React.FC<{
         throw new Error(result.error || 'Failed to delete records');
       }
 
-      // Refresh attendance data by calling parent callback
-      onUpdateAttendance(parseInt(subjectId), new Date(), 'present');
-      
       const count = result.count || 0;
       alert(`Successfully deleted ${count} record(s) (${statusText}) for ${subject.name}`);
+      
+      // Reload page to refresh data (prevents auto-marking current date)
+      window.location.reload();
     } catch (error) {
       console.error('Error deleting records:', error);
       alert(`Error: ${error instanceof Error ? error.message : 'Could not delete records'}`);
