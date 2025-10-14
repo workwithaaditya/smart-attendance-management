@@ -1535,6 +1535,9 @@ const SubjectGraphsModal: React.FC<{
   onClose: () => void;
   getSubjectChartData: (subjectId: number) => any;
 }> = ({ subjects, attendanceRecords, onClose, getSubjectChartData }) => {
+  const [showOverview, setShowOverview] = useState(true);
+  const [predictDate, setPredictDate] = useState('');
+  const [predictResults, setPredictResults] = useState<any[]>([]);
   
   // Calculate statistics for a subject
   const getSubjectStats = (subjectId: number) => {
@@ -1554,6 +1557,64 @@ const SubjectGraphsModal: React.FC<{
       percentage,
       recordCount: records.filter(r => r.status !== 'holiday').length
     };
+  };
+
+  // Predict attendance for a specific date
+  const handlePredictToDate = () => {
+    if (!predictDate) {
+      alert('Please select a date');
+      return;
+    }
+
+    const targetDate = new Date(predictDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (targetDate <= today) {
+      alert('Please select a future date');
+      return;
+    }
+
+    const results = subjects.map(subject => {
+      const stats = getSubjectStats(subject.id);
+      const currentPercentage = stats.percentage;
+      
+      // Calculate working days between now and target date (excluding Sundays)
+      let workingDays = 0;
+      const current = new Date(today);
+      while (current < targetDate) {
+        current.setDate(current.getDate() + 1);
+        if (current.getDay() !== 0) { // Not Sunday
+          workingDays++;
+        }
+      }
+
+      // Estimate classes needed (assume 1 class per working day)
+      const estimatedClasses = workingDays;
+      
+      // Scenarios
+      const allPresent = ((stats.totalPresent + estimatedClasses) / (stats.totalClasses + estimatedClasses)) * 100;
+      const allAbsent = (stats.totalPresent / (stats.totalClasses + estimatedClasses)) * 100;
+      const currentTrend = currentPercentage; // If trend continues
+      
+      // Classes needed to reach 75%
+      const classesFor75 = stats.totalClasses > 0
+        ? Math.max(0, Math.ceil((0.75 * stats.totalClasses - stats.totalPresent) / 0.25))
+        : 0;
+
+      return {
+        subject,
+        current: currentPercentage,
+        allPresent,
+        allAbsent,
+        estimatedClasses,
+        classesFor75,
+        workingDays,
+        stats
+      };
+    });
+
+    setPredictResults(results);
   };
 
   const chartOptions = {
@@ -1622,24 +1683,188 @@ const SubjectGraphsModal: React.FC<{
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.9, opacity: 0 }}
-        className="bg-gray-800 rounded-lg p-8 max-w-4xl w-full max-h-[95vh] overflow-y-auto border border-gray-700 snap-y snap-mandatory"
+        className="bg-gray-800 rounded-lg p-6 max-w-6xl w-full max-h-[95vh] overflow-y-auto border border-gray-700"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex justify-between items-center mb-8 sticky top-0 bg-gray-800 z-10 pb-4">
-          <div>
-            <h3 className="text-3xl font-semibold text-white">Subject-wise Attendance Trends</h3>
-            <p className="text-sm text-gray-400 mt-1">Scroll down to see all subjects • Recent trends shown</p>
-          </div>
+        {/* Header */}
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-2xl font-semibold text-white">Attendance Analytics</h3>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-white text-3xl font-bold"
+            className="text-gray-400 hover:text-white text-2xl font-bold"
           >
             ×
           </button>
         </div>
 
-        <div className="space-y-8">
-          {subjects.map((subject) => {
+        {/* Tabs */}
+        <div className="flex space-x-2 mb-6 border-b border-gray-700">
+          <button
+            onClick={() => setShowOverview(true)}
+            className={`px-4 py-2 font-medium transition-colors ${
+              showOverview
+                ? 'text-blue-400 border-b-2 border-blue-400'
+                : 'text-gray-400 hover:text-gray-300'
+            }`}
+          >
+            Overview
+          </button>
+          <button
+            onClick={() => setShowOverview(false)}
+            className={`px-4 py-2 font-medium transition-colors ${
+              !showOverview
+                ? 'text-blue-400 border-b-2 border-blue-400'
+                : 'text-gray-400 hover:text-gray-300'
+            }`}
+          >
+            Detailed Trends
+          </button>
+        </div>
+
+        {/* Content */}
+        {showOverview ? (
+          <div className="space-y-6">
+            {/* All Subjects Gauge Overview */}
+            <div className="bg-gray-700/30 rounded-lg p-6">
+              <h4 className="text-lg font-semibold text-white mb-4">All Subjects at a Glance</h4>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {subjects.map(subject => {
+                  const stats = getSubjectStats(subject.id);
+                  const percentage = stats.percentage;
+                  const strokeDasharray = `${percentage * 2.51} 251`;
+                  
+                  return (
+                    <div key={subject.id} className="bg-gray-800/50 rounded-lg p-4 text-center">
+                      <div className="relative w-24 h-24 mx-auto mb-2">
+                        <svg className="transform -rotate-90 w-24 h-24">
+                          {/* Background circle */}
+                          <circle
+                            cx="48"
+                            cy="48"
+                            r="40"
+                            stroke="rgba(75, 85, 99, 0.3)"
+                            strokeWidth="8"
+                            fill="none"
+                          />
+                          {/* Progress circle */}
+                          <circle
+                            cx="48"
+                            cy="48"
+                            r="40"
+                            stroke={
+                              percentage >= 75 ? '#10b981' :
+                              percentage >= 60 ? '#f59e0b' : '#ef4444'
+                            }
+                            strokeWidth="8"
+                            fill="none"
+                            strokeDasharray={strokeDasharray}
+                            strokeLinecap="round"
+                            className="transition-all duration-500"
+                          />
+                        </svg>
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <span className={`text-lg font-bold ${
+                            percentage >= 75 ? 'text-green-400' :
+                            percentage >= 60 ? 'text-yellow-400' : 'text-red-400'
+                          }`}>
+                            {percentage.toFixed(0)}%
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-center space-x-2 mb-1">
+                        <div
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: subject.color }}
+                        />
+                        <div className="text-sm font-medium text-white truncate">{subject.name}</div>
+                      </div>
+                      <div className="text-xs text-gray-400">
+                        {stats.totalPresent}/{stats.totalClasses}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Predict to Date */}
+            <div className="bg-gray-700/30 rounded-lg p-6">
+              <h4 className="text-lg font-semibold text-white mb-4">Predict Attendance to Date</h4>
+              <div className="flex gap-3 mb-4">
+                <input
+                  type="date"
+                  value={predictDate}
+                  onChange={(e) => setPredictDate(e.target.value)}
+                  min={new Date().toISOString().split('T')[0]}
+                  className="flex-1 px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                />
+                <button
+                  onClick={handlePredictToDate}
+                  className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium"
+                >
+                  Predict
+                </button>
+              </div>
+
+              {predictResults.length > 0 && (
+                <div className="space-y-3">
+                  {predictResults.map(result => (
+                    <div key={result.subject.id} className="bg-gray-800/50 rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center space-x-2">
+                          <div
+                            className="w-3 h-3 rounded-full"
+                            style={{ backgroundColor: result.subject.color }}
+                          />
+                          <span className="font-medium text-white">{result.subject.name}</span>
+                        </div>
+                        <span className="text-sm text-gray-400">
+                          {result.workingDays} working days • ~{result.estimatedClasses} classes
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-4 gap-3 text-center">
+                        <div>
+                          <div className="text-xs text-gray-400 mb-1">Current</div>
+                          <div className={`text-lg font-bold ${
+                            result.current >= 75 ? 'text-green-400' :
+                            result.current >= 60 ? 'text-yellow-400' : 'text-red-400'
+                          }`}>
+                            {result.current.toFixed(1)}%
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-400 mb-1">All Present</div>
+                          <div className={`text-lg font-bold ${
+                            result.allPresent >= 75 ? 'text-green-400' :
+                            result.allPresent >= 60 ? 'text-yellow-400' : 'text-red-400'
+                          }`}>
+                            {result.allPresent.toFixed(1)}%
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-400 mb-1">All Absent</div>
+                          <div className={`text-lg font-bold ${
+                            result.allAbsent >= 75 ? 'text-green-400' :
+                            result.allAbsent >= 60 ? 'text-yellow-400' : 'text-red-400'
+                          }`}>
+                            {result.allAbsent.toFixed(1)}%
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-400 mb-1">Need for 75%</div>
+                          <div className="text-lg font-bold text-blue-400">
+                            {result.classesFor75} classes
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-8">{subjects.map((subject) => {
             const chartData = getSubjectChartData(subject.id);
             const stats = getSubjectStats(subject.id);
             
@@ -1661,19 +1886,19 @@ const SubjectGraphsModal: React.FC<{
                   </div>
                 </div>
 
-                {/* Statistics Cards */}
-                <div className="grid grid-cols-3 gap-4 mb-6">
-                  <div className="bg-green-900/30 border border-green-600/50 rounded-lg p-4 text-center">
-                    <div className="text-3xl font-bold text-green-400">{stats.totalPresent}</div>
-                    <div className="text-sm text-gray-400 mt-1">Present</div>
+                {/* Statistics Cards - Sleek & Minimal */}
+                <div className="grid grid-cols-3 gap-3 mb-6">
+                  <div className="bg-green-900/20 border border-green-600/30 rounded-lg p-3 text-center">
+                    <div className="text-xl font-semibold text-green-400">{stats.totalPresent}</div>
+                    <div className="text-xs text-gray-400 mt-0.5">Present</div>
                   </div>
-                  <div className="bg-red-900/30 border border-red-600/50 rounded-lg p-4 text-center">
-                    <div className="text-3xl font-bold text-red-400">{stats.totalAbsent}</div>
-                    <div className="text-sm text-gray-400 mt-1">Absent</div>
+                  <div className="bg-red-900/20 border border-red-600/30 rounded-lg p-3 text-center">
+                    <div className="text-xl font-semibold text-red-400">{stats.totalAbsent}</div>
+                    <div className="text-xs text-gray-400 mt-0.5">Absent</div>
                   </div>
-                  <div className="bg-blue-900/30 border border-blue-600/50 rounded-lg p-4 text-center">
-                    <div className="text-3xl font-bold text-blue-400">{stats.totalClasses}</div>
-                    <div className="text-sm text-gray-400 mt-1">Total Classes</div>
+                  <div className="bg-blue-900/20 border border-blue-600/30 rounded-lg p-3 text-center">
+                    <div className="text-xl font-semibold text-blue-400">{stats.totalClasses}</div>
+                    <div className="text-xs text-gray-400 mt-0.5">Total</div>
                   </div>
                 </div>
                 
@@ -1728,7 +1953,8 @@ const SubjectGraphsModal: React.FC<{
               </div>
             );
           })}
-        </div>
+          </div>
+        )}
       </motion.div>
     </motion.div>
   );
