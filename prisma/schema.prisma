@@ -47,6 +47,7 @@ model User {
   accounts      Account[]
   sessions      Session[]
   subjects      Subject[]
+  templates     Template[]
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
 
@@ -108,4 +109,55 @@ model AttendanceRecord {
 
   @@unique([subjectId, date, periodStart, periodEnd])
   @@map("attendance_records")
+}
+
+// Template Sharing System
+model Template {
+  id               Int                @id @default(autoincrement())
+  name             String             // e.g., "5th Sem ISE Section A Batch A1"
+  description      String?            // Optional description
+  semester         String?            // e.g., "5th Sem", "Semester 5"
+  section          String?            // e.g., "Section A"
+  batch            String?            // e.g., "Batch A1"
+  isPublic         Boolean            @default(true)
+  importCount      Int                @default(0)
+  userId           String
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  templateSubjects TemplateSubject[]
+  templateTimetable TemplateTimetable[]
+
+  @@index([semester, section, batch])
+  @@index([userId])
+  @@map("templates")
+}
+
+model TemplateSubject {
+  id                Int                @id @default(autoincrement())
+  name              String
+  code              String?            // Subject code (e.g., "CS501")
+  color             String             @default("#3B82F6")
+  templateId        Int
+  createdAt         DateTime           @default(now())
+  template          Template           @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  timetableSlots    TemplateTimetable[]
+
+  @@map("template_subjects")
+}
+
+model TemplateTimetable {
+  id                Int              @id @default(autoincrement())
+  dayOfWeek         String
+  periodStart       Int
+  periodEnd         Int
+  merged            Boolean          @default(false)
+  templateSubjectId Int
+  templateId        Int
+  createdAt         DateTime         @default(now())
+  templateSubject   TemplateSubject  @relation(fields: [templateSubjectId], references: [id], onDelete: Cascade)
+  template          Template         @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, dayOfWeek, periodStart, periodEnd])
+  @@map("template_timetable")
 }

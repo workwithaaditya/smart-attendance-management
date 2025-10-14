@@ -3,12 +3,16 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useSession, signIn, signOut } from 'next-auth/react';
+import { Upload } from 'lucide-react';
 import AcademicCalendar from '@/components/AcademicCalendar';
 import HolidayPredictor from '@/components/HolidayPredictor';
+import TemplateManager from '@/components/TemplateManager';
 
 export default function HomePage() {
   const { data: session, status } = useSession();
   const [activeTab, setActiveTab] = useState<'timetable' | 'predictor'>('timetable');
+  const [showTemplateManager, setShowTemplateManager] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // Loading state
   if (status === 'loading') {
@@ -132,7 +136,7 @@ export default function HomePage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="flex justify-center mb-8"
+          className="flex justify-center mb-8 gap-4"
         >
           <div className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-1 flex gap-1 border border-gray-700/50">
             <button
@@ -156,6 +160,15 @@ export default function HomePage() {
               Attendance Predictor
             </button>
           </div>
+
+          {/* Template Manager Button */}
+          <button
+            onClick={() => setShowTemplateManager(true)}
+            className="bg-purple-600/20 border-2 border-purple-500/50 text-purple-300 hover:bg-purple-600/30 px-6 py-3 rounded-lg font-medium transition-all duration-200 flex items-center gap-2 shadow-lg shadow-purple-500/10"
+          >
+            <Upload className="w-5 h-5" />
+            Templates
+          </button>
         </motion.div>
 
         {/* Content */}
@@ -164,9 +177,19 @@ export default function HomePage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
         >
-          {activeTab === 'timetable' && <AcademicCalendar />}
+          {activeTab === 'timetable' && <AcademicCalendar key={refreshKey} />}
           {activeTab === 'predictor' && <HolidayPredictor />}
         </motion.div>
+
+        {/* Template Manager Modal */}
+        <TemplateManager
+          isOpen={showTemplateManager}
+          onClose={() => setShowTemplateManager(false)}
+          onImportSuccess={() => {
+            setRefreshKey(prev => prev + 1);
+            setShowTemplateManager(false);
+          }}
+        />
 
         {/* Footer */}
         <motion.footer
