@@ -98,7 +98,18 @@ export default function HomePage() {
           animate={{ opacity: 1, y: 0 }}
           className="text-center mb-12 relative"
         >
-          {/* Logout Button */}
+          {/* Templates Button - Top Left */}
+          <div className="absolute top-0 left-0">
+            <button
+              onClick={() => setShowTemplateManager(true)}
+              className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-200 shadow-lg shadow-purple-500/20"
+            >
+              <Upload className="w-4 h-4" />
+              <span className="hidden sm:inline">Templates</span>
+            </button>
+          </div>
+
+          {/* Logout Button - Top Right */}
           <div className="absolute top-0 right-0">
             <div className="flex items-center gap-3 bg-gray-800/50 backdrop-blur-sm rounded-lg p-2 border border-gray-700/50">
               {session.user?.image && (
@@ -136,7 +147,7 @@ export default function HomePage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="flex justify-center mb-8 gap-4"
+          className="flex justify-center mb-8"
         >
           <div className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-1 flex gap-1 border border-gray-700/50">
             <button
@@ -160,15 +171,6 @@ export default function HomePage() {
               Attendance Predictor
             </button>
           </div>
-
-          {/* Template Manager Button */}
-          <button
-            onClick={() => setShowTemplateManager(true)}
-            className="bg-purple-600/20 border-2 border-purple-500/50 text-purple-300 hover:bg-purple-600/30 px-6 py-3 rounded-lg font-medium transition-all duration-200 flex items-center gap-2 shadow-lg shadow-purple-500/10"
-          >
-            <Upload className="w-5 h-5" />
-            Templates
-          </button>
         </motion.div>
 
         {/* Content */}

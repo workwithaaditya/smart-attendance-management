@@ -44,9 +44,10 @@ interface TemplateManagerProps {
   isOpen: boolean;
   onClose: () => void;
   onImportSuccess: () => void;
+  onQuickShare?: () => void;
 }
 
-export default function TemplateManager({ isOpen, onClose, onImportSuccess }: TemplateManagerProps) {
+export default function TemplateManager({ isOpen, onClose, onImportSuccess, onQuickShare }: TemplateManagerProps) {
   const [activeTab, setActiveTab] = useState<'browse' | 'my-templates' | 'create'>('browse');
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(false);
@@ -55,6 +56,7 @@ export default function TemplateManager({ isOpen, onClose, onImportSuccess }: Te
   const [sectionFilter, setSectionFilter] = useState('');
   const [batchFilter, setBatchFilter] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
+  const [showQuickShareModal, setShowQuickShareModal] = useState(false);
   
   // Create template form
   const [templateName, setTemplateName] = useState('');
@@ -120,7 +122,7 @@ export default function TemplateManager({ isOpen, onClose, onImportSuccess }: Te
       const data = await response.json();
       
       if (response.ok) {
-        alert('Template created successfully!');
+        alert('Template created successfully! 🎉');
         setTemplateName('');
         setTemplateDescription('');
         setTemplateSemester('');
@@ -133,6 +135,49 @@ export default function TemplateManager({ isOpen, onClose, onImportSuccess }: Te
     } catch (error) {
       console.error('Error creating template:', error);
       alert('Failed to create template');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleQuickShare = async () => {
+    if (!templateName.trim()) {
+      alert('Please enter a template name');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch('/api/templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: templateName,
+          description: templateDescription,
+          semester: templateSemester,
+          section: templateSection,
+          batch: templateBatch,
+          isPublic: true, // Always public for quick share
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        alert('Template shared successfully! 🎉\nYour classmates can now find it by searching.');
+        setShowQuickShareModal(false);
+        setTemplateName('');
+        setTemplateDescription('');
+        setTemplateSemester('');
+        setTemplateSection('');
+        setTemplateBatch('');
+        setActiveTab('my-templates');
+      } else {
+        alert(data.error || 'Failed to share template');
+      }
+    } catch (error) {
+      console.error('Error sharing template:', error);
+      alert('Failed to share template');
     } finally {
       setLoading(false);
     }
@@ -219,63 +264,61 @@ export default function TemplateManager({ isOpen, onClose, onImportSuccess }: Te
           className="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col"
         >
           {/* Header */}
-          <div className="p-6 border-b border-gray-700 flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-                <Upload className="w-6 h-6 text-purple-400" />
-                Template Manager
-              </h2>
-              <p className="text-gray-400 text-sm mt-1">
-                Share and import timetable templates
-              </p>
+          <div className="p-6 border-b border-gray-700">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                  <Upload className="w-6 h-6 text-purple-400" />
+                  Template Manager
+                </h2>
+                <p className="text-gray-400 text-sm mt-1">
+                  Share and import timetable templates
+                </p>
+              </div>
+              <button
+                onClick={onClose}
+                className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+              >
+                <X className="w-6 h-6 text-gray-400" />
+              </button>
             </div>
+
+            {/* Quick Share Button */}
             <button
-              onClick={onClose}
-              className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+              onClick={() => setShowQuickShareModal(true)}
+              className="w-full px-4 py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-medium rounded-lg transition-all duration-200 flex items-center justify-center gap-2 shadow-lg"
             >
-              <X className="w-6 h-6 text-gray-400" />
+              <Upload className="w-5 h-5" />
+              Share My Timetable as Template
             </button>
           </div>
 
           {/* Tabs */}
-          <div className="flex border-b border-gray-700 px-6">
+          <div className="flex border-b border-gray-700 bg-gray-800/50">
             <button
               onClick={() => setActiveTab('browse')}
-              className={`px-6 py-3 font-medium transition-colors border-b-2 ${
+              className={`flex-1 px-6 py-4 font-medium transition-all duration-200 border-b-2 ${
                 activeTab === 'browse'
-                  ? 'text-purple-400 border-purple-400'
-                  : 'text-gray-400 border-transparent hover:text-gray-300'
+                  ? 'text-purple-400 border-purple-400 bg-gray-700/30'
+                  : 'text-gray-400 border-transparent hover:text-gray-300 hover:bg-gray-700/20'
               }`}
             >
-              <span className="flex items-center gap-2">
+              <span className="flex items-center justify-center gap-2">
                 <Search className="w-4 h-4" />
                 Browse Templates
               </span>
             </button>
             <button
               onClick={() => setActiveTab('my-templates')}
-              className={`px-6 py-3 font-medium transition-colors border-b-2 ${
+              className={`flex-1 px-6 py-4 font-medium transition-all duration-200 border-b-2 ${
                 activeTab === 'my-templates'
-                  ? 'text-purple-400 border-purple-400'
-                  : 'text-gray-400 border-transparent hover:text-gray-300'
+                  ? 'text-purple-400 border-purple-400 bg-gray-700/30'
+                  : 'text-gray-400 border-transparent hover:text-gray-300 hover:bg-gray-700/20'
               }`}
             >
-              <span className="flex items-center gap-2">
+              <span className="flex items-center justify-center gap-2">
                 <Book className="w-4 h-4" />
                 My Templates
-              </span>
-            </button>
-            <button
-              onClick={() => setActiveTab('create')}
-              className={`px-6 py-3 font-medium transition-colors border-b-2 ${
-                activeTab === 'create'
-                  ? 'text-purple-400 border-purple-400'
-                  : 'text-gray-400 border-transparent hover:text-gray-300'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <Upload className="w-4 h-4" />
-                Create Template
               </span>
             </button>
           </div>
@@ -418,13 +461,10 @@ export default function TemplateManager({ isOpen, onClose, onImportSuccess }: Te
                 ) : templates.length === 0 ? (
                   <div className="text-center py-12">
                     <Upload className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-                    <p className="text-gray-400">You haven't created any templates yet</p>
-                    <button
-                      onClick={() => setActiveTab('create')}
-                      className="mt-4 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
-                    >
-                      Create Your First Template
-                    </button>
+                    <p className="text-gray-400 mb-2">You haven't created any templates yet</p>
+                    <p className="text-gray-500 text-sm mb-4">
+                      Click the "Share My Timetable as Template" button above to create one
+                    </p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -606,6 +646,125 @@ export default function TemplateManager({ isOpen, onClose, onImportSuccess }: Te
               </div>
             )}
           </div>
+
+          {/* Quick Share Modal */}
+          {showQuickShareModal && (
+            <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/70" onClick={() => setShowQuickShareModal(false)}>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col"
+              >
+                <div className="p-6 border-b border-gray-700 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-2xl font-bold text-white">Share Your Timetable</h3>
+                    <p className="text-gray-400 text-sm mt-1">
+                      Create a template from your current subjects and schedule
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowQuickShareModal(false)}
+                    className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+                  >
+                    <X className="w-6 h-6 text-gray-400" />
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-6">
+                  <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 mb-6">
+                    <p className="text-blue-300 text-sm">
+                      <strong>Note:</strong> This will create a public template from your current subjects and timetable.
+                      Make sure you've set up everything correctly before sharing.
+                    </p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-gray-300 font-medium mb-2">
+                        Template Name <span className="text-red-400">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g., 5th Sem ISE Section A Batch A1"
+                        value={templateName}
+                        onChange={(e) => setTemplateName(e.target.value)}
+                        className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-gray-300 font-medium mb-2">
+                        Description (Optional)
+                      </label>
+                      <textarea
+                        placeholder="Add details about this timetable..."
+                        value={templateDescription}
+                        onChange={(e) => setTemplateDescription(e.target.value)}
+                        rows={3}
+                        className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-gray-300 font-medium mb-2">
+                          Semester
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g., 5th"
+                          value={templateSemester}
+                          onChange={(e) => setTemplateSemester(e.target.value)}
+                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-gray-300 font-medium mb-2">
+                          Section
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g., A"
+                          value={templateSection}
+                          onChange={(e) => setTemplateSection(e.target.value)}
+                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-gray-300 font-medium mb-2">
+                          Batch
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g., A1"
+                          value={templateBatch}
+                          onChange={(e) => setTemplateBatch(e.target.value)}
+                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-6 border-t border-gray-700 flex gap-3">
+                  <button
+                    onClick={handleQuickShare}
+                    disabled={loading || !templateName.trim()}
+                    className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-all"
+                  >
+                    {loading ? 'Sharing...' : 'Share Template'}
+                  </button>
+                  <button
+                    onClick={() => setShowQuickShareModal(false)}
+                    className="px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white font-medium rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
 
           {/* Template Preview Modal */}
           {selectedTemplate && (
