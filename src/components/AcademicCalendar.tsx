@@ -1139,15 +1139,17 @@ const DailyAttendanceModal: React.FC<{
         console.log(`Importing ${dateStr} (${i+1}/${parsedDates.length})`);
         
         try {
-          // Use the new period-wise API - it auto-matches to next unmarked period
+          // PRIORITY: BULK UPLOAD MODE
+          // forceBulkCreate flag ensures EVERY upload creates EXACTLY one record
+          // This guarantees accurate counting: 32 uploads = 32 records
           const response = await fetch('/api/attendance', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               subjectId,
               date: date.toISOString(),
-              status: bulkImportData.status
-              // No periodStart/periodEnd - let API auto-match
+              status: bulkImportData.status,
+              forceBulkCreate: true  // ALWAYS create new record in bulk mode
             })
           });
           
@@ -1174,7 +1176,7 @@ const DailyAttendanceModal: React.FC<{
       if (failedDates.length > 0) {
         alert(`Partially imported: ${totalImported} succeeded, ${failedDates.length} failed\n\nFailed dates: ${failedDates.slice(0, 5).join(', ')}${failedDates.length > 5 ? '...' : ''}`);
       } else {
-        alert(`✅ Successfully imported ${totalImported} date(s)!\n\n📌 Each date creates one period record.\n📌 Same date multiple times = multiple period records.`);
+        alert(`✅ Successfully imported ${totalImported} attendance record(s)!\n\n🎯 GUARANTEED ACCURACY:\n• You uploaded: ${totalImported} dates\n• Created: ${totalImported} records\n• Graph will show: ${totalImported} ${bulkImportData.status}\n\n📊 Each upload = Exactly 1 record!`);
       }
       
       setBulkImportData({ subjectId: '', dates: '', status: 'present' });

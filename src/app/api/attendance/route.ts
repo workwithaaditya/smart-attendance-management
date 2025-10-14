@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
   try {
     const userId = await getUserId();
     const body = await request.json()
-    const { subjectId, date, status, periodStart, periodEnd } = body
+    const { subjectId, date, status, periodStart, periodEnd, forceBulkCreate } = body
 
     // Verify subject belongs to user
     const subject = await prisma.subject.findFirst({
@@ -72,6 +72,24 @@ export async function POST(request: NextRequest) {
         { error: 'Subject not found' },
         { status: 404 }
       )
+    }
+
+    // PRIORITY #1: BULK UPLOAD MODE
+    // If forceBulkCreate flag is set, ALWAYS create new record
+    // This ensures every upload creates exactly one record for accurate counting
+    if (forceBulkCreate) {
+      const record = await prisma.attendanceRecord.create({
+        data: {
+          subjectId: parseInt(subjectId),
+          date: new Date(date),
+          periodStart: periodStart ?? null,
+          periodEnd: periodEnd ?? null,
+          status,
+          count: 1
+        },
+        include: { subject: true }
+      })
+      return NextResponse.json(record, { status: 201 })
     }
 
     // Get the day of week from the date
@@ -120,10 +138,21 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // If all slots marked, mark the first one (overwrite)
-      if (targetPeriodStart === null && timetableSlots.length > 0) {
-        targetPeriodStart = timetableSlots[0].periodStart
-        targetPeriodEnd = timetableSlots[0].periodEnd
+      // If all slots marked, create new record without specific period
+      // This allows unlimited records per date (for manual/bulk uploads)
+      if (targetPeriodStart === null) {
+        const record = await prisma.attendanceRecord.create({
+          data: {
+            subjectId: parseInt(subjectId),
+            date: new Date(date),
+            periodStart: null,
+            periodEnd: null,
+            status,
+            count: 1
+          },
+          include: { subject: true }
+        })
+        return NextResponse.json(record, { status: 201 })
       }
     }
 
