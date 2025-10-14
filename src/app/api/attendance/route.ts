@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
   try {
     const userId = await getUserId();
     const body = await request.json()
-    const { subjectId, date, status, replaceWith } = body
+    const { subjectId, date, status, periodStart, periodEnd } = body
 
     // Verify subject belongs to user
     const subject = await prisma.subject.findFirst({
@@ -78,34 +78,75 @@ export async function POST(request: NextRequest) {
     const dateObj = new Date(date)
     const dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase()
     
-    // Count how many periods this subject has on this day
-    const periodsCount = await prisma.timetableSlot.count({
+    // Get all timetable slots for this subject on this day
+    const timetableSlots = await prisma.timetableSlot.findMany({
       where: {
         subjectId: parseInt(subjectId),
         dayOfWeek: dayOfWeek
-      }
+      },
+      orderBy: [
+        { periodStart: 'asc' }
+      ]
     })
 
-    // If replaceWith is provided, use that count exactly (for bulk import with duplicates)
-    // Otherwise use periodsCount from timetable
-    const finalCount = replaceWith !== undefined ? replaceWith : (periodsCount > 0 ? periodsCount : 1);
+    let targetPeriodStart: number | null = null
+    let targetPeriodEnd: number | null = null
 
-    const record = await prisma.attendanceRecord.upsert({
-      where: {
-        subjectId_date: {
+    // If period specified, use it directly
+    if (periodStart !== undefined && periodEnd !== undefined) {
+      targetPeriodStart = periodStart
+      targetPeriodEnd = periodEnd
+    } 
+    // Auto-match: Find next unmarked period
+    else if (timetableSlots.length > 0) {
+      // Check which periods already have attendance
+      const existingRecords = await prisma.attendanceRecord.findMany({
+        where: {
           subjectId: parseInt(subjectId),
           date: new Date(date)
         }
+      })
+
+      // Find first unmarked slot
+      for (const slot of timetableSlots) {
+        const alreadyMarked = existingRecords.some(
+          record => record.periodStart === slot.periodStart && record.periodEnd === slot.periodEnd
+        )
+        
+        if (!alreadyMarked) {
+          targetPeriodStart = slot.periodStart
+          targetPeriodEnd = slot.periodEnd
+          break
+        }
+      }
+
+      // If all slots marked, mark the first one (overwrite)
+      if (targetPeriodStart === null && timetableSlots.length > 0) {
+        targetPeriodStart = timetableSlots[0].periodStart
+        targetPeriodEnd = timetableSlots[0].periodEnd
+      }
+    }
+
+    // Create attendance record
+    const record = await prisma.attendanceRecord.upsert({
+      where: {
+        subjectId_date_periodStart_periodEnd: {
+          subjectId: parseInt(subjectId),
+          date: new Date(date),
+          periodStart: targetPeriodStart,
+          periodEnd: targetPeriodEnd
+        }
       },
       update: { 
-        status,
-        count: finalCount
+        status
       },
       create: {
         subjectId: parseInt(subjectId),
         date: new Date(date),
+        periodStart: targetPeriodStart,
+        periodEnd: targetPeriodEnd,
         status,
-        count: finalCount
+        count: 1
       },
       include: { subject: true }
     })
