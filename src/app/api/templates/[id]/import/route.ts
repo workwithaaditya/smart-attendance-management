@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma';
 // POST - Import template into user's subjects and timetable
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -15,7 +15,8 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const templateId = parseInt(params.id);
+    const { id } = await params;
+    const templateId = parseInt(id);
 
     // Fetch template with subjects and timetable
     const template = await prisma.template.findUnique({
