@@ -32,6 +32,9 @@ export default function HomePage() {
           className="max-w-md w-full bg-gray-800/50 backdrop-blur-sm rounded-2xl p-8 border border-gray-700/50 text-center"
         >
           <div className="mb-6">
+            <div className="flex justify-center mb-4">
+              <img src="/logo.svg" alt="Logo" className="w-20 h-20" />
+            </div>
             <h1 className="text-4xl font-light text-white mb-2">
               Smart Attendance Management
             </h1>
@@ -113,9 +116,12 @@ export default function HomePage() {
             </div>
           </div>
 
-          <h1 className="text-5xl font-light tracking-tight text-white mb-3">
-            Smart Attendance Management
-          </h1>
+          <div className="flex flex-col items-center mb-3">
+            <img src="/logo.svg" alt="Logo" className="w-16 h-16 mb-3" />
+            <h1 className="text-5xl font-light tracking-tight text-white">
+              Smart Attendance Management
+            </h1>
+          </div>
           <p className="text-gray-400 text-base font-light">
             Manage your academic schedule and track attendance
           </p>
