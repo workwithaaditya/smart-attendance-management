@@ -1118,60 +1118,36 @@ const DailyAttendanceModal: React.FC<{
         return;
       }
 
-      // Count duplicate dates
-      // If you enter same date multiple times, it counts as multiple periods
-      const dateCountMap = new Map<string, number>();
-      parsedDates.forEach(date => {
-        const dateStr = date.toISOString().split('T')[0];
-        dateCountMap.set(dateStr, (dateCountMap.get(dateStr) || 0) + 1);
-      });
-
-      // Import all unique dates
+      // NEW PERIOD-WISE LOGIC:
+      // Each date upload creates ONE record, auto-assigned to next unmarked period
+      // If you upload same date multiple times, each creates a separate period record
       const subjectId = parseInt(bulkImportData.subjectId);
-      const uniqueDates = Array.from(dateCountMap.entries());
       let totalImported = 0;
       let failedDates: string[] = [];
       
-      console.log('Starting bulk import:', {
+      console.log('Starting period-wise bulk import:', {
         subjectId,
         totalDates: parsedDates.length,
-        uniqueDates: uniqueDates.length,
-        timetableSlots: timetableSlots?.length || 0
+        status: bulkImportData.status
       });
       
-      for (let i = 0; i < uniqueDates.length; i++) {
-        const [dateStr, duplicateCount] = uniqueDates[i];
-        const date = new Date(dateStr + 'T00:00:00');
+      // Process each date (including duplicates)
+      for (let i = 0; i < parsedDates.length; i++) {
+        const date = parsedDates[i];
+        const dateStr = date.toISOString().split('T')[0];
         
-        // Get day of week to find timetable periods for this subject
-        const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
-        const periodsOnDay = timetableSlots?.filter(
-          slot => slot.subjectId === subjectId && slot.dayOfWeek === dayOfWeek
-        ).length || 0;
-        
-        // SMART COUNT CALCULATION:
-        // - If you enter same date 2 times + that day has 3 periods = 2 × 3 = 6 total count
-        // - If you enter same date 1 time + that day has 2 periods = 1 × 2 = 2 total count
-        // - If no timetable, each duplicate = 1 count
-        const totalCountForDate = duplicateCount * (periodsOnDay || 1);
-        
-        console.log(`Importing ${dateStr}:`, {
-          dayOfWeek,
-          periodsOnDay,
-          duplicateCount,
-          totalCountForDate
-        });
+        console.log(`Importing ${dateStr} (${i+1}/${parsedDates.length})`);
         
         try {
-          // Always use replaceWith for clean, predictable behavior
+          // Use the new period-wise API - it auto-matches to next unmarked period
           const response = await fetch('/api/attendance', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               subjectId,
               date: date.toISOString(),
-              status: bulkImportData.status,
-              replaceWith: totalCountForDate // Set exact count
+              status: bulkImportData.status
+              // No periodStart/periodEnd - let API auto-match
             })
           });
           
@@ -1183,28 +1159,22 @@ const DailyAttendanceModal: React.FC<{
           totalImported++;
         } catch (err) {
           console.error(`Failed to import ${dateStr}:`, err);
-          failedDates.push(dateStr);
+          if (!failedDates.includes(dateStr)) {
+            failedDates.push(dateStr);
+          }
         }
         
+        // Small delay to avoid overwhelming the API
         await new Promise(resolve => setTimeout(resolve, 50));
       }
 
       // Refresh attendance data
-      onUpdateAttendance(subjectId, new Date(), bulkImportData.status); // Trigger refresh
-      
-      const duplicateInfo = uniqueDates.filter(([, count]) => count > 1).length > 0 
-        ? `\n\nSmart Count Applied:\n${uniqueDates.filter(([, count]) => count > 1).map(([date, count]) => {
-            const d = new Date(date);
-            const day = d.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
-            const periods = timetableSlots?.filter(s => s.subjectId === subjectId && s.dayOfWeek === day).length || 1;
-            return `  • ${date}: ${count} entries × ${periods} periods = ${count * periods} total`;
-          }).join('\n')}`
-        : '';
+      onUpdateAttendance(subjectId, new Date(), bulkImportData.status);
       
       if (failedDates.length > 0) {
         alert(`Partially imported: ${totalImported} succeeded, ${failedDates.length} failed\n\nFailed dates: ${failedDates.slice(0, 5).join(', ')}${failedDates.length > 5 ? '...' : ''}`);
       } else {
-        alert(`Successfully imported ${totalImported} date(s)!${duplicateInfo}`);
+        alert(`✅ Successfully imported ${totalImported} date(s)!\n\n📌 Each date creates one period record.\n📌 Same date multiple times = multiple period records.`);
       }
       
       setBulkImportData({ subjectId: '', dates: '', status: 'present' });
@@ -1415,19 +1385,24 @@ const DailyAttendanceModal: React.FC<{
 
               {/* Example Box */}
               <div className="mt-6 bg-gray-900/50 border border-gray-700 rounded-lg p-4">
-                <h5 className="text-sm font-semibold text-yellow-400 mb-2">Smart Duplicate Handling</h5>
+                <h5 className="text-sm font-semibold text-yellow-400 mb-2">📋 Period-Wise Attendance</h5>
                 <div className="text-xs text-gray-300 space-y-2">
-                  <p><strong>Example 1:</strong> If you enter same date 2 times + that day has 3 periods:</p>
-                  <pre className="bg-gray-800 p-2 rounded font-mono">
-19-08-2025
-19-08-2025
-→ Result: 2 × 3 = 6 total count for that date</pre>
+                  <p><strong>New System:</strong> Each period is tracked separately for accurate graphs!</p>
                   
-                  <p className="mt-3"><strong>Example 2:</strong> Different dates, each counted with their periods:</p>
+                  <p className="mt-3"><strong>Example 1:</strong> Math has 2 periods on Monday (Period 1-2 and Period 7-8):</p>
                   <pre className="bg-gray-800 p-2 rounded font-mono">
-19-08-2025 (Monday: 2 periods)
-21-08-2025 (Wednesday: 3 periods)
-→ Result: 2 + 3 = 5 total classes</pre>
+19-08-2025, Math, Present
+19-08-2025, Math, Absent
+→ Result: Period 1-2 = Present, Period 7-8 = Absent
+→ Graph shows: 50% attendance (1 out of 2)</pre>
+                  
+                  <p className="mt-3"><strong>Example 2:</strong> Auto-matching with timetable:</p>
+                  <pre className="bg-gray-800 p-2 rounded font-mono">
+First upload → Assigns to earliest period
+Second upload (same day) → Assigns to next period
+Third upload → Assigns to third period (if exists)</pre>
+
+                  <p className="mt-3 text-yellow-300">✨ No need to specify period numbers - system auto-matches!</p>
                 </div>
               </div>
             </div>
