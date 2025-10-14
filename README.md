@@ -10,11 +10,21 @@ A modern, interactive web application that helps students track their attendance
 ## ✨ Features
 
 ### 📚 Core Functionality
-- **Subject Management**: Add and manage multiple subjects
-- **Weekly Scheduling**: Assign subjects to specific days of the week
-- **Attendance Tracking**: Record current attendance data for each subject
-- **Smart Predictions**: Calculate future attendance based on planned absences
+- **Subject Management**: Add and manage multiple subjects with custom colors
+- **Weekly Scheduling**: Create detailed timetables with period-wise slots
+- **Attendance Tracking**: Record attendance with support for multiple periods per day
+- **Smart Predictions**: Calculate future attendance based on planned absences and holidays
 - **Interactive Calendar**: Mark future absences and holidays with visual indicators
+- **Template Sharing**: Create and share timetable templates with classmates (NEW! 🎉)
+
+### 🔄 Template System (NEW!)
+- **Create Templates**: Export your subjects and timetable as reusable templates
+- **Browse & Search**: Find templates by semester, section, batch, or keywords
+- **Quick Import**: Set up your schedule in 5 seconds instead of 30 minutes
+- **Public/Private**: Share templates publicly or keep them private
+- **Popularity Ranking**: Most-imported templates appear first
+- **Batch Support**: Perfect for students in the same class/section/batch
+- 📖 [View detailed documentation](./TEMPLATE_SYSTEM.md)
 
 ### 📊 Advanced Analytics
 - **Real-time Calculations**: Instant updates to attendance percentages
