@@ -1170,14 +1170,15 @@ const DailyAttendanceModal: React.FC<{
         await new Promise(resolve => setTimeout(resolve, 50));
       }
 
-      // Refresh attendance data
-      onUpdateAttendance(subjectId, new Date(), bulkImportData.status);
-      
+      // Show success message
       if (failedDates.length > 0) {
         alert(`Partially imported: ${totalImported} succeeded, ${failedDates.length} failed\n\nFailed dates: ${failedDates.slice(0, 5).join(', ')}${failedDates.length > 5 ? '...' : ''}`);
       } else {
         alert(`✅ Successfully imported ${totalImported} attendance record(s)!\n\n🎯 GUARANTEED ACCURACY:\n• You uploaded: ${totalImported} dates\n• Created: ${totalImported} records\n• Graph will show: ${totalImported} ${bulkImportData.status}\n\n📊 Each upload = Exactly 1 record!`);
       }
+      
+      // Reload page to refresh all data (prevents auto-marking current date)
+      window.location.reload();
       
       setBulkImportData({ subjectId: '', dates: '', status: 'present' });
       setShowBulkImport(false);
