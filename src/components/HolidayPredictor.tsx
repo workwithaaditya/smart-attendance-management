@@ -421,86 +421,192 @@ const HolidayPredictor: React.FC = () => {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-gray-800 rounded-lg p-6 space-y-4"
+          className="bg-gray-800 rounded-lg p-6 space-y-6"
         >
-          <h3 className="text-2xl font-semibold text-white mb-4">
+          <h3 className="text-xl font-semibold text-white">
             Predictions to {new Date(targetDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
           </h3>
           
-          <div className="grid md:grid-cols-2 gap-4">
+          {/* Individual Subject Cards - Minimal Single Color */}
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
             {predictions.map((pred, index) => (
               <div
                 key={index}
-                className="bg-gradient-to-br from-gray-700 to-gray-800 rounded-lg p-5 border-2"
-                style={{ borderColor: pred.subject.color || '#3B82F6' }}
+                className="bg-gray-700/30 border border-gray-600 rounded-lg p-4 hover:border-gray-500 transition-colors"
               >
-                <h4 className="text-xl font-bold text-white mb-3">{pred.subject.name}</h4>
-                
-                {/* Current vs Future */}
-                <div className="grid grid-cols-2 gap-3 mb-4">
-                  <div className="bg-gray-900/50 rounded-lg p-3">
-                    <p className="text-xs text-gray-400">Current</p>
-                    <p className="text-2xl font-bold text-white">{pred.currentPercentage.toFixed(1)}%</p>
-                    <p className="text-xs text-gray-400">{pred.currentAttended}/{pred.currentTotal}</p>
-                  </div>
-                  <div className="bg-gray-900/50 rounded-lg p-3">
-                    <p className="text-xs text-gray-400">By Target Date</p>
-                    <p className="text-2xl font-bold" style={{ color: pred.subject.color }}>
-                      {pred.futurePercentage.toFixed(1)}%
-                    </p>
-                    <p className="text-xs text-gray-400">{pred.futureAttended}/{pred.futureTotal}</p>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-base font-semibold text-white">{pred.subject.name}</h4>
+                  <div className="text-right">
+                    <div className="text-xs text-gray-400">Current</div>
+                    <div className="text-lg font-bold text-white">{pred.currentPercentage.toFixed(1)}%</div>
                   </div>
                 </div>
-
-                {/* Stats */}
-                <div className="space-y-2 text-sm">
+                
+                <div className="space-y-1.5 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-gray-300">Classes till date:</span>
-                    <span className="text-white font-bold">{pred.classesInPeriod}</span>
+                    <span className="text-gray-400">By Target Date</span>
+                    <span className="font-semibold text-white">{pred.futurePercentage.toFixed(1)}%</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-300">Will attend:</span>
-                    <span className="text-green-400 font-bold">{pred.attendedInPeriod}</span>
+                    <span className="text-gray-400">Will Attend</span>
+                    <span className="text-white">{pred.attendedInPeriod}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-300">Will miss:</span>
-                    <span className="text-red-400 font-bold">{pred.missedInPeriod}</span>
+                    <span className="text-gray-400">Will Miss</span>
+                    <span className="text-white">{pred.missedInPeriod}</span>
                   </div>
-                  <div className="flex justify-between pt-2 border-t border-gray-600">
-                    <span className="text-gray-300">Change:</span>
-                    <span className={`font-bold ${pred.percentageChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      {pred.percentageChange >= 0 ? '+' : ''}{pred.percentageChange.toFixed(2)}%
+                  <div className="flex justify-between pt-1.5 border-t border-gray-600">
+                    <span className="text-gray-400">Change</span>
+                    <span className="font-semibold text-white">
+                      {pred.percentageChange >= 0 ? '+' : ''}{pred.percentageChange.toFixed(1)}%
                     </span>
                   </div>
                 </div>
-
-                {/* Warning */}
-                {pred.futurePercentage < 75 && (
-                  <div className="mt-3 bg-red-900/30 border border-red-600/50 rounded p-2 text-xs text-red-300">
-                    Below 75% threshold
-                  </div>
-                )}
               </div>
             ))}
           </div>
 
-          {/* Summary Stats */}
-          <div className="bg-gradient-to-r from-purple-900/20 to-blue-900/20 border border-purple-600/30 rounded-lg p-4 mt-4">
-            <h4 className="font-semibold text-white mb-2">Summary</h4>
+          {/* Overall Summary Chart */}
+          <div className="bg-gray-700/30 border border-gray-600 rounded-lg p-6">
+            <h4 className="text-lg font-semibold text-white mb-4">Overall Summary</h4>
+            
+            {/* Summary Stats */}
+            <div className="grid grid-cols-4 gap-4 mb-6">
+              <div className="text-center">
+                <div className="text-xs text-gray-400 mb-1">Total Classes</div>
+                <div className="text-2xl font-bold text-white">
+                  {predictions.reduce((sum, p) => sum + p.classesInPeriod, 0)}
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-xs text-gray-400 mb-1">Will Attend</div>
+                <div className="text-2xl font-bold text-white">
+                  {predictions.reduce((sum, p) => sum + p.attendedInPeriod, 0)}
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-xs text-gray-400 mb-1">Will Miss</div>
+                <div className="text-2xl font-bold text-white">
+                  {predictions.reduce((sum, p) => sum + p.missedInPeriod, 0)}
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-xs text-gray-400 mb-1">Avg Change</div>
+                <div className="text-2xl font-bold text-white">
+                  {predictions.length > 0 
+                    ? ((predictions.reduce((sum, p) => sum + p.percentageChange, 0) / predictions.length) >= 0 ? '+' : '')
+                    + (predictions.reduce((sum, p) => sum + p.percentageChange, 0) / predictions.length).toFixed(1)
+                    : '0.0'}%
+                </div>
+              </div>
+            </div>
+
+            {/* Bar Chart */}
+            <div className="space-y-3">
+              {predictions.map((pred, index) => {
+                const maxPercentage = 100;
+                const currentWidth = (pred.currentPercentage / maxPercentage) * 100;
+                const futureWidth = (pred.futurePercentage / maxPercentage) * 100;
+                
+                return (
+                  <div key={index} className="space-y-1">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-300 font-medium">{pred.subject.name}</span>
+                      <span className="text-gray-400">
+                        {pred.currentPercentage.toFixed(1)}% → {pred.futurePercentage.toFixed(1)}%
+                      </span>
+                    </div>
+                    <div className="flex gap-2 items-center">
+                      {/* Current Bar */}
+                      <div className="flex-1 bg-gray-700 rounded-full h-6 overflow-hidden">
+                        <div 
+                          className="bg-gray-500 h-full flex items-center justify-end px-2 transition-all duration-500"
+                          style={{ width: `${currentWidth}%` }}
+                        >
+                          {currentWidth > 15 && (
+                            <span className="text-xs font-semibold text-white">
+                              {pred.currentPercentage.toFixed(0)}%
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <span className="text-gray-400 text-xs">→</span>
+                      {/* Future Bar */}
+                      <div className="flex-1 bg-gray-700 rounded-full h-6 overflow-hidden">
+                        <div 
+                          className="bg-blue-500 h-full flex items-center justify-end px-2 transition-all duration-500"
+                          style={{ width: `${futureWidth}%` }}
+                        >
+                          {futureWidth > 15 && (
+                            <span className="text-xs font-semibold text-white">
+                              {pred.futurePercentage.toFixed(0)}%
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Summary Table */}
+          <div className="bg-gray-700/30 border border-gray-600 rounded-lg overflow-hidden">
+            <table className="w-full">
+              <thead className="bg-gray-700/50">
+                <tr className="text-left text-xs text-gray-400 uppercase tracking-wider">
+                  <th className="px-4 py-3">Subject</th>
+                  <th className="px-4 py-3 text-center">Total Classes</th>
+                  <th className="px-4 py-3 text-center">Will Attend</th>
+                  <th className="px-4 py-3 text-center">Will Miss</th>
+                  <th className="px-4 py-3 text-center">Change</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-700">
+                {predictions.map((pred, index) => (
+                  <tr key={index} className="hover:bg-gray-700/30 transition-colors">
+                    <td className="px-4 py-3 text-white font-medium">{pred.subject.name}</td>
+                    <td className="px-4 py-3 text-center text-white">{pred.classesInPeriod}</td>
+                    <td className="px-4 py-3 text-center text-white">{pred.attendedInPeriod}</td>
+                    <td className="px-4 py-3 text-center text-white">{pred.missedInPeriod}</td>
+                    <td className="px-4 py-3 text-center">
+                      <span className="font-semibold text-white">
+                        {pred.percentageChange >= 0 ? '↑ +' : '↓ '}{Math.abs(pred.percentageChange).toFixed(1)}%
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Summary Footer */}
+          <div className="bg-gradient-to-r from-purple-900/20 to-blue-900/20 border border-purple-600/30 rounded-lg p-4">
             <div className="grid grid-cols-3 gap-4 text-center">
               <div>
-                <p className="text-sm text-gray-400">College Holidays</p>
-                <p className="text-2xl font-bold text-red-400">{collegeHolidays.size}</p>
+                <div className="text-xs text-gray-400 mb-1">College Holidays</div>
+                <div className="text-2xl font-bold text-white">{Array.from(collegeHolidays).length}</div>
               </div>
               <div>
-                <p className="text-sm text-gray-400">Personal Leaves</p>
-                <p className="text-2xl font-bold text-orange-400">{personalLeaves.size}</p>
+                <div className="text-xs text-gray-400 mb-1">Personal Leaves</div>
+                <div className="text-2xl font-bold text-white">{Array.from(personalLeaves).length}</div>
               </div>
               <div>
-                <p className="text-sm text-gray-400">Working Days</p>
-                <p className="text-2xl font-bold text-green-400">
-                  {new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 0).getDate() - collegeHolidays.size}
-                </p>
+                <div className="text-xs text-gray-400 mb-1">Working Days</div>
+                <div className="text-2xl font-bold text-white">
+                  {(() => {
+                    const today = new Date();
+                    const target = new Date(targetDate);
+                    let days = 0;
+                    const current = new Date(today);
+                    while (current <= target) {
+                      if (current.getDay() !== 0) days++;
+                      current.setDate(current.getDate() + 1);
+                    }
+                    return days - Array.from(collegeHolidays).length;
+                  })()}
+                </div>
               </div>
             </div>
           </div>
