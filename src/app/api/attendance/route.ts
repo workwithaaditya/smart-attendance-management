@@ -158,7 +158,7 @@ export async function POST(request: NextRequest) {
 
     // NO TIMETABLE: Always create new record for each upload
     // This allows multiple records per date when user doesn't have timetable configured
-    if (timetableSlots.length === 0) {
+    if (timetableSlots.length === 0 || targetPeriodStart === null || targetPeriodEnd === null) {
       const record = await prisma.attendanceRecord.create({
         data: {
           subjectId: parseInt(subjectId),
@@ -173,14 +173,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(record, { status: 201 })
     }
 
-    // WITH TIMETABLE: Use upsert to update if period already marked
+    // WITH TIMETABLE AND VALID PERIOD: Use upsert to update if period already marked
     const record = await prisma.attendanceRecord.upsert({
       where: {
         subjectId_date_periodStart_periodEnd: {
           subjectId: parseInt(subjectId),
           date: new Date(date),
-          periodStart: targetPeriodStart,
-          periodEnd: targetPeriodEnd
+          periodStart: targetPeriodStart,  // Now guaranteed to be non-null
+          periodEnd: targetPeriodEnd        // Now guaranteed to be non-null
         }
       },
       update: { 
@@ -277,16 +277,19 @@ export async function DELETE(request: NextRequest) {
         )
       }
 
-      await prisma.attendanceRecord.delete({
+      // Delete all records for this subject on this date
+      // (since we can now have multiple records per date with period-wise tracking)
+      const result = await prisma.attendanceRecord.deleteMany({
         where: {
-          subjectId_date: {
-            subjectId: parseInt(bodySubjectId),
-            date: new Date(date)
-          }
+          subjectId: parseInt(bodySubjectId),
+          date: new Date(date)
         }
       })
 
-      return NextResponse.json({ message: 'Attendance record deleted successfully' })
+      return NextResponse.json({ 
+        message: `Deleted ${result.count} attendance record(s) for this date`,
+        count: result.count
+      })
     } catch (jsonError) {
       return NextResponse.json(
         { error: 'Invalid request: provide query params (subjectId & status) for bulk delete or body (subjectId & date) for single delete' },
