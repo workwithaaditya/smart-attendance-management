@@ -453,6 +453,16 @@ export default function TemplateManager({ isOpen, onClose, onImportSuccess, onQu
             {/* My Templates */}
             {activeTab === 'my-templates' && (
               <div className="space-y-4">
+                {/* Template Limit Info */}
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 flex items-center justify-between">
+                  <p className="text-blue-300 text-sm">
+                    <strong>Templates:</strong> {templates.length} / 5 (Maximum limit to save space)
+                  </p>
+                  {templates.length >= 5 && (
+                    <span className="text-yellow-400 text-xs">Limit reached! Delete some to create new ones.</span>
+                  )}
+                </div>
+
                 {loading ? (
                   <div className="text-center py-12">
                     <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto"></div>

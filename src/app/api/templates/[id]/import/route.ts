@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getUserId } from '@/lib/session';
 
 // POST - Import template into user's subjects and timetable
 export async function POST(
@@ -9,11 +10,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const userId = await getUserId();
 
     const { id } = await params;
     const templateId = parseInt(id);
@@ -38,7 +35,7 @@ export async function POST(
     }
 
     // Check if template is public or belongs to user
-    if (!template.isPublic && template.userId !== session.user.email) {
+    if (!template.isPublic && template.userId !== userId) {
       return NextResponse.json(
         { error: 'This template is private' },
         { status: 403 }
@@ -52,7 +49,7 @@ export async function POST(
     if (clearExisting) {
       await prisma.subject.deleteMany({
         where: {
-          userId: session.user.email,
+          userId,
         },
       });
     }
@@ -63,7 +60,7 @@ export async function POST(
       // Check if subject already exists (by name)
       const existingSubject = await prisma.subject.findFirst({
         where: {
-          userId: session.user.email,
+          userId,
           name: templateSubject.name,
         },
       });
@@ -83,7 +80,7 @@ export async function POST(
           data: {
             name: templateSubject.name,
             color: templateSubject.color,
-            userId: session.user.email,
+            userId,
           },
         });
       }
@@ -128,6 +125,11 @@ export async function POST(
     });
   } catch (error) {
     console.error('Error importing template:', error);
+    
+    if ((error as Error).message === 'Unauthorized') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    
     return NextResponse.json(
       { error: 'Failed to import template' },
       { status: 500 }

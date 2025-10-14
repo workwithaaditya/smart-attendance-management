@@ -2,12 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getUserId } from '@/lib/session';
 
 // GET - Browse all public templates or user's own templates
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    
     const searchParams = request.nextUrl.searchParams;
     const semester = searchParams.get('semester');
     const section = searchParams.get('section');
@@ -19,10 +18,12 @@ export async function GET(request: NextRequest) {
 
     // If viewing own templates, require authentication
     if (myTemplates) {
-      if (!session?.user?.email) {
+      try {
+        const userId = await getUserId();
+        whereClause.userId = userId;
+      } catch (error) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       }
-      whereClause.userId = session.user.email;
     } else {
       // Public templates only
       whereClause.isPublic = true;
@@ -79,11 +80,7 @@ export async function GET(request: NextRequest) {
 // POST - Create new template from user's current subjects and timetable
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const userId = await getUserId();
 
     const body = await request.json();
     const { name, description, semester, section, batch, isPublic = true } = body;
@@ -95,10 +92,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check template limit (max 5 templates per user)
+    const existingTemplatesCount = await prisma.template.count({
+      where: {
+        userId,
+      },
+    });
+
+    if (existingTemplatesCount >= 5) {
+      return NextResponse.json(
+        { error: 'You have reached the maximum limit of 5 templates. Please delete some templates before creating new ones.' },
+        { status: 400 }
+      );
+    }
+
     // Get user's subjects with timetable
     const subjects = await prisma.subject.findMany({
       where: {
-        userId: session.user.email,
+        userId,
       },
       include: {
         timetableSlots: true,
@@ -121,7 +132,7 @@ export async function POST(request: NextRequest) {
         section: section?.trim() || null,
         batch: batch?.trim() || null,
         isPublic,
-        userId: session.user.email,
+        userId,
         templateSubjects: {
           create: subjects.map((subject: any) => ({
             name: subject.name,
@@ -161,11 +172,7 @@ export async function POST(request: NextRequest) {
 // DELETE - Delete own template
 export async function DELETE(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const userId = await getUserId();
 
     const searchParams = request.nextUrl.searchParams;
     const templateId = searchParams.get('id');
@@ -189,7 +196,7 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    if (template.userId !== session.user.email) {
+    if (template.userId !== userId) {
       return NextResponse.json(
         { error: 'You can only delete your own templates' },
         { status: 403 }
@@ -203,6 +210,11 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error deleting template:', error);
+    
+    if ((error as Error).message === 'Unauthorized') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    
     return NextResponse.json(
       { error: 'Failed to delete template' },
       { status: 500 }
