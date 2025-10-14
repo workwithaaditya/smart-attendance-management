@@ -127,7 +127,24 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create attendance record
+    // NO TIMETABLE: Always create new record for each upload
+    // This allows multiple records per date when user doesn't have timetable configured
+    if (timetableSlots.length === 0) {
+      const record = await prisma.attendanceRecord.create({
+        data: {
+          subjectId: parseInt(subjectId),
+          date: new Date(date),
+          periodStart: null,
+          periodEnd: null,
+          status,
+          count: 1
+        },
+        include: { subject: true }
+      })
+      return NextResponse.json(record, { status: 201 })
+    }
+
+    // WITH TIMETABLE: Use upsert to update if period already marked
     const record = await prisma.attendanceRecord.upsert({
       where: {
         subjectId_date_periodStart_periodEnd: {
