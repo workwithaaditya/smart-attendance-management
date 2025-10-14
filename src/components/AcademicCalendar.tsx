@@ -571,7 +571,7 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({ onSubjectUpdate }) 
                   className="text-gray-400 hover:text-red-400 text-xs p-1"
                   title="Delete Subject"
                 >
-                  🗑️
+                  ×
                 </button>
               </div>
             </motion.div>
@@ -1059,7 +1059,7 @@ const DailyAttendanceModal: React.FC<{
                       status === 'present' ? 'Present records' :
                       status === 'absent' ? 'Absent records' : 'Holiday records';
     
-    const confirmed = confirm(`⚠️ Are you sure you want to delete ${statusText} for ${subject.name}?\n\nThis action cannot be undone!`);
+    const confirmed = confirm(`Delete ${statusText} for ${subject.name}? This cannot be undone.`);
     if (!confirmed) return;
 
     try {
@@ -1114,7 +1114,7 @@ const DailyAttendanceModal: React.FC<{
       }
 
       if (parsedDates.length === 0) {
-        alert('No valid dates found. Please use format: DD-MM-YYYY (one per line)');
+        alert('No valid dates found. Use DD-MM-YYYY format.');
         return;
       }
 
@@ -1172,9 +1172,9 @@ const DailyAttendanceModal: React.FC<{
 
       // Show success message
       if (failedDates.length > 0) {
-        alert(`Partially imported: ${totalImported} succeeded, ${failedDates.length} failed\n\nFailed dates: ${failedDates.slice(0, 5).join(', ')}${failedDates.length > 5 ? '...' : ''}`);
+        alert(`Imported ${totalImported} records. ${failedDates.length} failed: ${failedDates.slice(0, 5).join(', ')}${failedDates.length > 5 ? '...' : ''}`);
       } else {
-        alert(`✅ Successfully imported ${totalImported} attendance record(s)!\n\n🎯 GUARANTEED ACCURACY:\n• You uploaded: ${totalImported} dates\n• Created: ${totalImported} records\n• Graph will show: ${totalImported} ${bulkImportData.status}\n\n📊 Each upload = Exactly 1 record!`);
+        alert(`Successfully imported ${totalImported} records.`);
       }
       
       // Reload page to refresh all data (prevents auto-marking current date)
@@ -1184,7 +1184,7 @@ const DailyAttendanceModal: React.FC<{
       setShowBulkImport(false);
     } catch (error) {
       console.error('Bulk import error:', error);
-      alert(`❌ Error: ${error instanceof Error ? error.message : 'Error importing dates. Please check the format and try again.'}`);
+      alert(`Error: ${error instanceof Error ? error.message : 'Failed to import dates.'}`);
     }
   };
 
@@ -1271,7 +1271,7 @@ const DailyAttendanceModal: React.FC<{
                           : 'bg-gray-700 hover:bg-green-600 text-gray-200'
                       }`}
                     >
-                      ✓ Present
+                      Present
                     </button>
                     <button
                       onClick={() => setBulkImportData({...bulkImportData, status: 'absent'})}
@@ -1281,7 +1281,7 @@ const DailyAttendanceModal: React.FC<{
                           : 'bg-gray-700 hover:bg-red-600 text-gray-200'
                       }`}
                     >
-                      ✗ Absent
+                      Absent
                     </button>
                     <button
                       onClick={() => setBulkImportData({...bulkImportData, status: 'holiday'})}
@@ -1291,7 +1291,7 @@ const DailyAttendanceModal: React.FC<{
                           : 'bg-gray-700 hover:bg-yellow-600 text-gray-200'
                       }`}
                     >
-                      🏖️ Holiday
+                      Holiday
                     </button>
                   </div>
                 </div>
@@ -1299,7 +1299,7 @@ const DailyAttendanceModal: React.FC<{
                 {/* Clear Records Section */}
                 <div className="bg-red-900/20 border border-red-600/50 rounded-lg p-4">
                   <label className="block text-sm font-medium text-red-400 mb-3">
-                    🗑️ Clear Records (Before Re-importing)
+                    Clear Records
                   </label>
                   <div className="grid grid-cols-2 gap-2">
                     <button
@@ -1348,7 +1348,7 @@ const DailyAttendanceModal: React.FC<{
                     </button>
                   </div>
                   <p className="text-xs text-gray-400 mt-2">
-                    ⚠️ Select a subject first. Use before re-importing to avoid duplicates.
+                    Select a subject before clearing records.
                   </p>
                 </div>
 
@@ -1360,12 +1360,12 @@ const DailyAttendanceModal: React.FC<{
                   <textarea
                     value={bulkImportData.dates}
                     onChange={(e) => setBulkImportData({...bulkImportData, dates: e.target.value})}
-                    placeholder="19-08-2025&#10;21-08-2025&#10;22-08-2025&#10;24-08-2025&#10;..."
+                    placeholder="19-08-2025&#10;21-08-2025&#10;22-08-2025&#10;24-08-2025"
                     rows={12}
                     className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
                   />
                   <p className="text-xs text-gray-400 mt-2">
-                    Format: DD-MM-YYYY (one date per line). Example: 19-08-2025
+                    DD-MM-YYYY format, one per line
                   </p>
                 </div>
 
@@ -1385,29 +1385,6 @@ const DailyAttendanceModal: React.FC<{
                   </button>
                 </div>
               </div>
-
-              {/* Example Box */}
-              <div className="mt-6 bg-gray-900/50 border border-gray-700 rounded-lg p-4">
-                <h5 className="text-sm font-semibold text-yellow-400 mb-2">📋 Period-Wise Attendance</h5>
-                <div className="text-xs text-gray-300 space-y-2">
-                  <p><strong>New System:</strong> Each period is tracked separately for accurate graphs!</p>
-                  
-                  <p className="mt-3"><strong>Example 1:</strong> Math has 2 periods on Monday (Period 1-2 and Period 7-8):</p>
-                  <pre className="bg-gray-800 p-2 rounded font-mono">
-19-08-2025, Math, Present
-19-08-2025, Math, Absent
-→ Result: Period 1-2 = Present, Period 7-8 = Absent
-→ Graph shows: 50% attendance (1 out of 2)</pre>
-                  
-                  <p className="mt-3"><strong>Example 2:</strong> Auto-matching with timetable:</p>
-                  <pre className="bg-gray-800 p-2 rounded font-mono">
-First upload → Assigns to earliest period
-Second upload (same day) → Assigns to next period
-Third upload → Assigns to third period (if exists)</pre>
-
-                  <p className="mt-3 text-yellow-300">✨ No need to specify period numbers - system auto-matches!</p>
-                </div>
-              </div>
             </div>
           </div>
         ) : (
@@ -1424,14 +1401,6 @@ Third upload → Assigns to third period (if exists)</pre>
                 calendarType="gregory"
                 locale="en-IN"
               />
-            </div>
-            
-            <div className="mt-4 bg-blue-900/30 border border-blue-600/50 rounded-lg p-4">
-              <h5 className="text-sm font-semibold text-blue-300 mb-2">Pro Tip</h5>
-              <p className="text-xs text-gray-300">
-                You can mark attendance for past dates to feed historical data. 
-                This will automatically update your attendance graphs and statistics.
-              </p>
             </div>
           </div>
 
@@ -1516,7 +1485,7 @@ Third upload → Assigns to third period (if exists)</pre>
                               : 'bg-gray-600 hover:bg-green-600 text-gray-200 hover:text-white'
                           }`}
                         >
-                          ✓ Present
+                          Present
                         </button>
                         <button
                           onClick={() => onUpdateAttendance(subject.id, selectedDate, 'absent')}
@@ -1526,7 +1495,7 @@ Third upload → Assigns to third period (if exists)</pre>
                               : 'bg-gray-600 hover:bg-red-600 text-gray-200 hover:text-white'
                           }`}
                         >
-                          ✗ Absent
+                          Absent
                         </button>
                         <button
                           onClick={() => onUpdateAttendance(subject.id, selectedDate, 'holiday')}
@@ -1536,7 +1505,7 @@ Third upload → Assigns to third period (if exists)</pre>
                               : 'bg-gray-600 hover:bg-yellow-600 text-gray-200 hover:text-white'
                           }`}
                         >
-                          🏖️ Holiday
+                          Holiday
                         </button>
                       </div>
                     </div>
